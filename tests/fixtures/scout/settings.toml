@@ -1,0 +1,6 @@
+[service]
+port = 7319
+health_path = "/ready"
+
+[retry]
+max_attempts = 4

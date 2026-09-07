@@ -1,0 +1,3 @@
+[api]
+timeout_ms = 1000
+retries = 3
