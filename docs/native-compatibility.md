@@ -17,6 +17,8 @@
 
 隔離 config 使用官方 `project_root_markers` 指向 workspace 的 `.feather-root`，讓後續即使外層加入 Git repository，也有明確的試用專案根目錄。
 
+另以隔離負向素材把 scout.toml 改成無效 TOML，再直接執行 native debug prompt-input，仍正常退出且沒有錯誤。因此此 debug 入口不能驗證角色 TOML 載入；四角色的靜態格式檢查由 Python tomllib 負責，原生角色生效仍需 smoke 驗收。
+
 預期 scout = `gpt-5.6-luna / low`；TOML 設定相同；實際值 **未確認**。
 尚未啟用會消耗模型用量的 smoke test。原生角色與實際模型須在該測試中確認；無法使用時保留錯誤，不替換模型。
 

@@ -28,7 +28,8 @@ def prepare(trial, scenario="scout"):
     # Exclusive creation prevents overwriting a previous run or a real Codex home.
     trial.mkdir(parents=True, exist_ok=False)
     (trial / "home/agents").mkdir(parents=True)
-    shutil.copytree(ROOT / "tests/fixtures" / scenario, trial / "workspace")
+    shutil.copytree(ROOT / "tests/fixtures" / scenario, trial / "workspace",
+                    ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     for role in ROLES:
         shutil.copy2(ROOT / "templates" / f"{role}.toml", trial / "home/agents" / f"{role}.toml")
     shutil.copy2(ROOT / "templates/AGENTS.md", trial / "workspace/AGENTS.md")
@@ -155,12 +156,12 @@ def main():
         check(trial)
         if args.action == "smoke" and not (args.enable_live and args.main_model and args.main_reasoning):
             parser.error("smoke requires --enable-live, --main-model, and --main-reasoning")
+        if args.action == "smoke" and (trial / "smoke.stdout").exists():
+            raise ValueError("Prepare a fresh directory for each smoke run")
         native(trial, args.codex, ["--version"], "version")
         if args.action == "probe":
             native(trial, args.codex, ["debug", "prompt-input", "Feather configuration probe"], "probe")
         else:
-            if (trial / "smoke.stdout").exists():
-                raise ValueError("Prepare a fresh directory for each smoke run")
             scenario = json.loads((trial / "manifest.json").read_text(encoding="utf-8"))["scenario"]
             sandbox = "workspace-write" if SCENARIOS[scenario]["writes"] else "read-only"
             native(trial, args.codex, ["exec", "--strict-config", "--skip-git-repo-check",

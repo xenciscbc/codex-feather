@@ -25,3 +25,9 @@
 - 真實 Codex home、既有角色、hook、主模型、reasoning 及並行數未修改。
 
 完整命令與人工驗收步驟見 README；模型測試須加 `--enable-live` 並使用使用者選定的主模型／reasoning 和隔離登入。
+
+## 最終離線結果
+
+`python -m unittest discover -s tests -v`：11 項測試通過（6.818 秒，測試 runner 的牆鐘紀錄，非模型耗時）。`python -m compileall -q scripts tests` 通過。四角色 native 指令載入探測成功，但負向測試證明該 debug 入口不驗證角色 TOML。
+
+code-review 的規範與規格兩軸已分別完成。發現一項版本證據覆寫問題，已修正並以先失敗後通過的回歸測試驗證；詳見 [審查紀錄](review.md)。

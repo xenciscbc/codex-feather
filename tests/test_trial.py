@@ -140,6 +140,18 @@ def retry_delay(attempt, base, cap):
                 (trial / file).write_text(value)
                 self.assertNotEqual(self.run_trial("check", trial).returncode, 0)
 
+    def test_rejected_repeat_preserves_original_version_evidence(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            trial = Path(temporary) / "trial"
+            self.run_trial("prepare", trial)
+            (trial / "smoke.stdout").write_text("original run")
+            (trial / "version.stdout").write_text("original version")
+            result = self.run_trial("smoke", trial, "--codex", sys.executable,
+                                    "--enable-live", "--main-model", "test-model", "--main-reasoning", "low")
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual((trial / "version.stdout").read_text(), "original version")
+            self.assertEqual((trial / "smoke.stdout").read_text(), "original run")
+
 
 if __name__ == "__main__":
     unittest.main()
