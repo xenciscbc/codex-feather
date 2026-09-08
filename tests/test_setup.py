@@ -973,6 +973,27 @@ class SetupTest(unittest.TestCase):
         request = capture_tools(CODEX, self.project, self.user_home, self.codex_home)
         self.assertEqual(skill_paths(render_messages(request.get("input", [])), "group/renamed-handoff"), [alias.resolve()])
 
+    def test_migration_preserves_source_aliases_without_creating_duplicates(self):
+        self.add_delegation()
+        for source, destination in [("user", "project"), ("project", "user")]:
+            self.assertEqual(self.run_setup("install", "--components", "all", "--scope", source).returncode, 0)
+            root = self.user_home if source == "user" else self.project
+            for component, relative, content in [
+                ("handoff", ".agents/skills/renamed/SKILL.md", b"---\nname: feather-handoff\ndescription: Alias\n---\n"),
+                ("delegation", ".codex/agents/renamed.toml", b'name = "scout"\ndescription = "Alias"\ndeveloper_instructions = "Read"\n'),
+            ]:
+                with self.subTest(source=source, component=component):
+                    alias = root / relative
+                    alias.parent.mkdir(parents=True, exist_ok=True)
+                    alias.write_bytes(content)
+                    before = {str(p): p.read_bytes() for p in self.directory.rglob("*") if p.is_file()}
+                    result = self.run_setup("migrate", "--components", component, "--from", source, "--to", destination)
+                    self.assertNotEqual(result.returncode, 0, result.stdout)
+                    self.assertIn("already declared", result.stderr)
+                    self.assertEqual({str(p): p.read_bytes() for p in self.directory.rglob("*") if p.is_file()}, before)
+                    alias.unlink()
+            self.assertEqual(self.run_setup("remove", "--components", "all", "--scope", source).returncode, 0)
+
     def test_native_codex_discovers_user_roles_and_skill(self):
         if os.name == "nt":
             profile = os.environ.get("FEATHER_TEST_WINDOWS_PROFILE")

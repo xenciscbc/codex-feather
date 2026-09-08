@@ -44,8 +44,6 @@ def reuse_candidate(environment: Environment, component: str, ignore: Environmen
                   else [f".codex/agents/{role}.toml" for role in ROLES])
     found = []
     for other in candidates:
-        if ignore and other.identity == ignore.identity:
-            continue
         if component == "handoff":
             canonical = other.target(".agents/skills/feather-handoff/SKILL.md")
             for file in skill_files(canonical.parent.parent):
@@ -63,6 +61,9 @@ def reuse_candidate(environment: Environment, component: str, ignore: Environmen
                 declared = tomllib.loads(content.decode("utf-8-sig")).get("name")
                 if declared in ROLES and file.name != f"{declared}.toml":
                     raise ValueError(f"Conflict: native role {declared} is already declared by {file}. Resolve the identity collision before installing.")
+        # Migration excludes its canonical source files, but unowned aliases still conflict.
+        if ignore and other.identity == ignore.identity:
+            continue
         paths = [other.target(identity) for identity in identities]
         if paths == [environment.target(identity) for identity in identities]:
             continue
