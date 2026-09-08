@@ -23,9 +23,10 @@
 
 ## 靜態檢查
 
-需要 Python 3.11+，使用標準函式庫。Windows 原生探測需要 Codex CLI；本次版本為 0.153.4。
+需要 Python 3.11+。試用工具使用標準函式庫；包含安裝器的完整驗收需先安裝 `requirements-setup-dev.txt`。Windows 原生探測需要 Codex CLI；本次版本為 0.153.4。
 
 ```powershell
+python -m pip install -r requirements-setup-dev.txt
 python -m unittest discover -s tests
 python -m compileall -q scripts tests
 python scripts/trial.py prepare .scratch/feather-mvp/runs/my-scout --scenario scout

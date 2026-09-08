@@ -3,7 +3,6 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import re
 import shutil
 import subprocess
 import sys
@@ -12,7 +11,7 @@ import time
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 
-from setup_native import capture_tools
+from setup_native import capture_tools, registered_tools, render_messages, skill_paths
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -73,10 +72,10 @@ class SetupTest(unittest.TestCase):
         shutil.copyfile(ROOT / "templates/AGENTS.md", templates / "AGENTS.md")
         self.write_manifest()
 
-    def run_setup(self, action, *arguments, codex=CODEX, input=None, environment=None, fail_replace=(), fail_unlink=(), pause_replace=None):
+    def run_setup(self, action, *arguments, codex=CODEX, input=None, environment=None, fail_replace=(), fail_unlink=(), pause_replace=None, edit_after_read=None):
         executable = os.environ.get("FEATHER_TEST_INSTALLER")
         command = [executable] if executable else [sys.executable, str(ROOT / "scripts/feather_setup.py")]
-        if fail_replace or fail_unlink or pause_replace:
+        if fail_replace or fail_unlink or pause_replace or edit_after_read:
             if executable:
                 self.skipTest("Filesystem fault adapter exercises the source CLI; native binaries use real filesystem checks")
             wrapper = self.directory / "filesystem_fault.py"
@@ -84,9 +83,19 @@ class SetupTest(unittest.TestCase):
                 "import os, pathlib, runpy, sys, time\n"
                 "original_replace = os.replace\n"
                 "original_unlink = os.unlink\n"
+                "original_read = pathlib.Path.read_bytes\n"
                 f"targets = {list(fail_replace)!r}\n"
                 f"unlink_targets = {list(fail_unlink)!r}\n"
                 f"pause = {pause_replace!r}\n"
+                f"edit_after_read = {edit_after_read!r}\n"
+                "edited = False\n"
+                "def read(path):\n"
+                "    global edited\n"
+                "    content = original_read(path)\n"
+                "    if edit_after_read and not edited and str(path) == edit_after_read[0]:\n"
+                "        edited = True\n"
+                "        path.write_bytes(content + edit_after_read[1])\n"
+                "    return content\n"
                 "def replace(source, destination, *args, **kwargs):\n"
                 "    if pause and pathlib.Path(destination).name == pause[0]:\n"
                 "        pathlib.Path(pause[1]).touch()\n"
@@ -104,6 +113,7 @@ class SetupTest(unittest.TestCase):
                 "    return original_unlink(path, *args, **kwargs)\n"
                 "os.replace = replace\n"
                 "os.unlink = unlink\n"
+                "pathlib.Path.read_bytes = read\n"
                 "entry = sys.argv.pop(1)\n"
                 "sys.path.insert(0, str(pathlib.Path(entry).parent))\n"
                 "runpy.run_path(entry, run_name='__main__')\n", encoding="utf-8")
@@ -222,14 +232,11 @@ class SetupTest(unittest.TestCase):
                                encoding="utf-8", timeout=30)
         self.assertEqual(probe.returncode, 0, probe.stderr)
         messages = json.loads(probe.stdout)
-        rendered = "\n".join(block.get("text", "") for message in messages for block in message.get("content", []))
+        rendered = render_messages(messages)
         self.assertIn("<!-- feather-setup:handoff:begin -->", rendered)
         self.assertIn("Native override probe.", rendered)
-        roots = dict(re.findall(r"- `(r\d+)` = `([^`]+)`", rendered))
-        alias = re.search(r"\(file: (r\d+)/feather-handoff/SKILL.md\)", rendered)
-        self.assertIsNotNone(alias, "Native Codex must list the installed handoff skill")
-        deployed = Path(roots[alias.group(1)]) / "feather-handoff/SKILL.md"
-        self.assertEqual(deployed.resolve(), (self.project / ".agents/skills/feather-handoff/SKILL.md").resolve())
+        self.assertEqual(skill_paths(rendered, "feather-handoff"),
+                         [(self.project / ".agents/skills/feather-handoff/SKILL.md").resolve()])
 
     def test_packaged_installer_runs_without_python_on_path(self):
         if not os.environ.get("FEATHER_TEST_INSTALLER"):
@@ -283,8 +290,7 @@ class SetupTest(unittest.TestCase):
             'project_root_markers = [".feather-root"]\n'
             f'[projects.{json.dumps(str(self.project))}]\ntrust_level = "trusted"\n', encoding="utf-8")
         request = capture_tools(CODEX, self.project, self.user_home, self.codex_home)
-        registered = request.get("tools", []) + [tool for item in request.get("input", [])
-                                                  if item.get("type") == "additional_tools" for tool in item["tools"]]
+        registered = registered_tools(request)
         tools = json.dumps(registered, ensure_ascii=False)
         for role in ["scout", "analyst", "mech-executor", "executor"]:
             self.assertTrue(role in tools, f"Native tool registration missing {role}; registered types: {[item.get('name') for item in registered]}")
@@ -387,16 +393,16 @@ class SetupTest(unittest.TestCase):
             'project_root_markers = [".feather-root"]\n'
             f'[projects.{json.dumps(str(self.project))}]\ntrust_level = "trusted"\n', encoding="utf-8")
         request = capture_tools(CODEX, self.project, self.user_home, self.codex_home)
-        rendered = "\n".join(block.get("text", "") for item in request.get("input", []) for block in item.get("content", []))
+        rendered = render_messages(request.get("input", []))
         self.assertIn("<!-- feather-setup:handoff:begin -->", rendered)
         self.assertIn("<!-- feather-setup:delegation:begin -->", rendered)
         self.assertIn("only when", rendered)
         other = self.directory / "other-project"
         other.mkdir()
         request = capture_tools(CODEX, other, self.user_home, self.codex_home)
-        rendered = "\n".join(block.get("text", "") for item in request.get("input", []) for block in item.get("content", []))
+        rendered = render_messages(request.get("input", []))
         self.assertIn("only when", rendered)
-        self.assertNotRegex(rendered, r"\(file: r\d+/feather-handoff/SKILL.md\)")
+        self.assertEqual(skill_paths(rendered, "feather-handoff"), [])
 
     def test_entrance_conflict_and_write_failure_leave_no_partial_install(self):
         target = self.project / "AGENTS.md"
@@ -727,8 +733,7 @@ class SetupTest(unittest.TestCase):
             result = self.run_setup("migrate", "--components", "delegation", "--from", source, "--to", destination)
             self.assertEqual(result.returncode, 0, result.stderr)
             request = capture_tools(CODEX, self.project, self.user_home, self.codex_home)
-            registered = request.get("tools", []) + [tool for item in request.get("input", [])
-                                                      if item.get("type") == "additional_tools" for tool in item["tools"]]
+            registered = registered_tools(request)
             for role in ["scout", "analyst", "mech-executor", "executor"]:
                 self.assertIn(role, json.dumps(registered))
             self.assertIn("feather-setup:delegation:begin", json.dumps(request))
@@ -930,6 +935,44 @@ class SetupTest(unittest.TestCase):
         self.assertTrue((self.project / ".agents/skills/feather-handoff/SKILL.md").exists())
         self.assertFalse((self.project / "AGENTS.md").exists())
 
+    def test_editor_save_during_entrance_planning_is_preserved(self):
+        entry = self.project / "AGENTS.md"
+        entry.write_bytes(b"original user instructions\n")
+        concurrent = b"editor added these outside instructions\n"
+        result = self.run_setup("install", "--entrance", "project", edit_after_read=(str(entry), concurrent))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(entry.read_bytes(), b"original user instructions\n" + concurrent)
+        self.assertFalse((self.project / ".agents/skills/feather-handoff/SKILL.md").exists())
+
+    def test_editor_save_after_component_validation_is_not_force_replaced(self):
+        self.assertEqual(self.run_setup("install").returncode, 0)
+        skill = self.project / ".agents/skills/feather-handoff/SKILL.md"
+        original = skill.read_bytes()
+        asset = self.bundle / "assets/skills/feather-handoff/SKILL.md"
+        asset.write_bytes(original + b"\nnew release\n")
+        self.write_manifest("0.2.0")
+        concurrent = b"\neditor added this local rule\n"
+        result = self.run_setup("update", "--on-conflict", "replace", edit_after_read=(str(skill), concurrent))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(skill.read_bytes(), original + concurrent)
+
+    def test_same_skill_name_in_another_directory_is_not_duplicated(self):
+        alias = self.project / ".agents/skills/group/renamed-handoff/SKILL.md"
+        alias.parent.mkdir(parents=True)
+        for name in ["feather-handoff", '"feather\\u002dhandoff"', ">-\n  feather-handoff"]:
+            with self.subTest(name=name):
+                content = f"---\nname: {name}\ndescription: Existing handoff skill\n---\nMy own skill.\n".encode()
+                alias.write_bytes(content)
+                result = self.run_setup("install")
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(alias.read_bytes(), content)
+                self.assertFalse((self.project / ".agents/skills/feather-handoff/SKILL.md").exists())
+        self.codex_home.mkdir(parents=True)
+        (self.project / ".feather-root").touch()
+        (self.codex_home / "config.toml").write_text('project_root_markers = [".feather-root"]\n')
+        request = capture_tools(CODEX, self.project, self.user_home, self.codex_home)
+        self.assertEqual(skill_paths(render_messages(request.get("input", [])), "group/renamed-handoff"), [alias.resolve()])
+
     def test_native_codex_discovers_user_roles_and_skill(self):
         if os.name == "nt":
             profile = os.environ.get("FEATHER_TEST_WINDOWS_PROFILE")
@@ -954,18 +997,14 @@ class SetupTest(unittest.TestCase):
         result = self.run_setup("install", "--scope", "user", "--components", "all", "--entrance", "user")
         self.assertEqual(result.returncode, 0, result.stderr)
         request = capture_tools(CODEX, self.project, self.user_home, self.codex_home)
-        registered = request.get("tools", []) + [tool for item in request.get("input", [])
-                                                  if item.get("type") == "additional_tools" for tool in item["tools"]]
+        registered = registered_tools(request)
         tools = json.dumps(registered, ensure_ascii=False)
         for role in ["scout", "analyst", "mech-executor", "executor"]:
             self.assertTrue(role in tools, f"User-scope role was not registered: {role}")
-        rendered = "\n".join(block.get("text", "") for item in request.get("input", []) for block in item.get("content", []))
+        rendered = render_messages(request.get("input", []))
         self.assertIn("<!-- feather-setup:handoff:begin -->", rendered)
-        roots = dict(re.findall(r"- `(r\d+)` = `([^`]+)`", rendered))
-        alias = re.search(r"\(file: (r\d+)/feather-handoff/SKILL.md\)", rendered)
-        self.assertIsNotNone(alias, f"Native user-skill roots: {roots}")
-        self.assertEqual((Path(roots[alias.group(1)]) / "feather-handoff/SKILL.md").resolve(),
-                         (self.user_home / ".agents/skills/feather-handoff/SKILL.md").resolve())
+        self.assertEqual(skill_paths(rendered, "feather-handoff"),
+                         [(self.user_home / ".agents/skills/feather-handoff/SKILL.md").resolve()])
         (self.project / ".feather-root").touch()
         (self.codex_home / "config.toml").write_text(
             'project_root_markers = [".feather-root"]\n'
@@ -975,13 +1014,9 @@ class SetupTest(unittest.TestCase):
             result = self.run_setup("migrate", "--components", "all", "--from", source, "--to", destination)
             self.assertEqual(result.returncode, 0, result.stderr)
             request = capture_tools(CODEX, self.project, self.user_home, self.codex_home)
-            rendered = "\n".join(block.get("text", "") for item in request.get("input", [])
-                                   for block in item.get("content", []))
-            roots = dict(re.findall(r"- `(r\d+)` = `([^`]+)`", rendered))
-            alias = re.search(r"\(file: (r\d+)/feather-handoff/SKILL.md\)", rendered)
-            self.assertIsNotNone(alias)
-            self.assertEqual((Path(roots[alias.group(1)]) / "feather-handoff/SKILL.md").resolve(),
-                             (expected_root / ".agents/skills/feather-handoff/SKILL.md").resolve())
+            rendered = render_messages(request.get("input", []))
+            self.assertEqual(skill_paths(rendered, "feather-handoff"),
+                             [(expected_root / ".agents/skills/feather-handoff/SKILL.md").resolve()])
             self.assertIn("feather-setup:handoff:begin", rendered)
 
 

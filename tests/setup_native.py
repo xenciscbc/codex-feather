@@ -2,9 +2,25 @@
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import threading
+
+
+def registered_tools(request: dict) -> list[dict]:
+    return request.get("tools", []) + [tool for item in request.get("input", [])
+                                       if item.get("type") == "additional_tools" for tool in item["tools"]]
+
+
+def render_messages(messages: list[dict]) -> str:
+    return "\n".join(block.get("text", "") for message in messages for block in message.get("content", []))
+
+
+def skill_paths(rendered: str, directory_name: str) -> list[Path]:
+    roots = dict(re.findall(r"- `(r\d+)` = `([^`]+)`", rendered))
+    aliases = re.findall(r"\(file: (r\d+)/" + re.escape(directory_name) + r"/SKILL\.md\)", rendered)
+    return [(Path(roots[alias]) / directory_name / "SKILL.md").resolve() for alias in aliases]
 
 
 def capture_tools(codex: str, project: Path, user_home: Path, codex_home: Path) -> dict:

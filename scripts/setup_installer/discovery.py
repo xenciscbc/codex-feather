@@ -1,10 +1,40 @@
 """Find existing capabilities before creating a second visible installation."""
 from dataclasses import replace
+import os
+from pathlib import Path
 import tomllib
+import yaml  # type: ignore[import-untyped]
 
 from .bundle import ROLES
 from .environment import Environment
 from .transaction import read_regular
+
+
+def skill_name(content: bytes) -> str | None:
+    try:
+        lines = content.decode("utf-8-sig").splitlines()
+        if not lines or lines[0].strip() != "---":
+            return None
+        stop = next((index for index, line in enumerate(lines[1:], 1) if line.strip() == "---"), None)
+        if stop is None:
+            return None
+        metadata = yaml.safe_load("\n".join(lines[1:stop]))
+        name = metadata.get("name") if isinstance(metadata, dict) else None
+        return name if isinstance(name, str) else None
+    except (UnicodeError, yaml.YAMLError, RecursionError):
+        return None  # Invalid skill metadata is not a native identity.
+
+
+def skill_files(root: Path):
+    seen = set()
+    for directory, children, files in os.walk(root, followlinks=True):
+        resolved = Path(directory).resolve()
+        if resolved in seen:
+            children[:] = []
+        else:
+            seen.add(resolved)
+        if "SKILL.md" in files:
+            yield Path(directory) / "SKILL.md"
 
 
 def reuse_candidate(environment: Environment, component: str, ignore: Environment | None = None) -> dict | None:
@@ -16,6 +46,14 @@ def reuse_candidate(environment: Environment, component: str, ignore: Environmen
     for other in candidates:
         if ignore and other.identity == ignore.identity:
             continue
+        if component == "handoff":
+            canonical = other.target(".agents/skills/feather-handoff/SKILL.md")
+            for file in skill_files(canonical.parent.parent):
+                if file == canonical:
+                    continue
+                # These are discovery inputs, never mutation targets; existing linked skills may be read.
+                if skill_name(file.read_bytes()) == "feather-handoff":
+                    raise ValueError(f"Conflict: native skill feather-handoff is already declared by {file}. Resolve the identity collision; no duplicate was installed.")
         if component == "delegation":
             role_directory = other.target(".codex/agents/scout.toml").parent
             for file in role_directory.glob("*.toml"):
@@ -31,6 +69,8 @@ def reuse_candidate(environment: Environment, component: str, ignore: Environmen
         present = [path for path in paths if read_regular(path) is not None]
         if not present:
             continue
+        if component == "handoff" and skill_name(read_regular(present[0]) or b"") != "feather-handoff":
+            raise ValueError(f"Conflict: existing skill has missing or different native identity: {present[0]}")
         if len(present) != len(paths):
             raise ValueError(f"Conflict: partial {component} installation in {other.scope} scope. Resolve it or explicitly migrate; no duplicate was installed.")
         found.append({"status": "reused", "scope": other.scope, "project": str(other.project),

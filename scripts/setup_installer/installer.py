@@ -11,8 +11,8 @@ from . import entrances
 from .conflicts import ConflictError
 
 
-def read_state(environment: Environment) -> dict:
-    saved = read_regular(environment.state_path)
+def read_state(environment: Environment, plan: Plan) -> dict:
+    saved = plan.read(environment.state_path)
     state = json.loads(saved) if saved is not None else {"format": 1, "environment": environment.identity, "components": {}}
     if state.get("format") != 1:
         raise ValueError("Unsupported installation record")
@@ -25,10 +25,10 @@ def execute(action: str, environment: Environment, bundle: Bundle, components: l
             dry_run: bool = False, entrance: str = "none", on_conflict: str = "fail",
             expected_plan: str | None = None) -> dict:
     state_path = environment.state_path
-    state = read_state(environment)
+    plan = Plan()
+    state = read_state(environment, plan)
     report: dict[str, Any] = {"action": action, "components": {}, "project": str(environment.project),
                               "scope": environment.scope, "dry_run": dry_run, "changes": [], "entrances": {}}
-    plan = Plan()
     managed_operation = False
     components = list(bundle.components) if "all" in components else list(dict.fromkeys(components))
     if action in {"install", "update"}:
@@ -50,11 +50,8 @@ def execute(action: str, environment: Environment, bundle: Bundle, components: l
                 managed_operation = True
                 record = state["components"].setdefault(component, {"reused": existing, "files": {}})
                 link = entrances.location(environment, entrance)
-                if record.get("entrance") and record["entrance"] != link:
-                    raise ValueError("Existing entrance is in another scope; remove it explicitly before changing scope")
-                report["entrances"][component] = entrances.manage(plan, environment, bundle, component, link,
-                                                                   replace=on_conflict == "replace")
-                record["entrance"] = link
+                report["entrances"][component] = entrances.attach(plan, environment, bundle, component, record, link,
+                                                                  replace=on_conflict == "replace")
             continue
         files = bundle.files(component)
         if action == "remove":
@@ -65,7 +62,7 @@ def execute(action: str, environment: Environment, bundle: Bundle, components: l
             for target, expected in old["files"].items():
                 validate_target(component, target)
                 path = environment.target(target)
-                before = read_regular(path)
+                before = plan.read(path)
                 if before is not None and digest(before) != expected and on_conflict != "replace":
                     encoded = old.get("contents", {}).get(target)
                     raise ConflictError(path, base64.b64decode(encoded) if encoded else None, before, None)
@@ -88,7 +85,7 @@ def execute(action: str, environment: Environment, bundle: Bundle, components: l
                 validate_target(component, target)
                 content = files.get(target)
                 path = environment.target(target)
-                before = read_regular(path)
+                before = plan.read(path)
                 owned = bool(old and target in old["files"])
                 expected_hash = old["files"].get(target) if old else None
                 if (before is not None and digest(before) != expected_hash) or (owned and before is None):
@@ -105,11 +102,8 @@ def execute(action: str, environment: Environment, bundle: Bundle, components: l
             if entrance != "none" or (action == "update" and old and old.get("entrance")):
                 record = state["components"][component]
                 link = entrances.location(environment, entrance) if entrance != "none" else old["entrance"]
-                if record.get("entrance") and record["entrance"] != link:
-                    raise ValueError("Existing entrance is in another scope; remove it explicitly before changing scope")
-                report["entrances"][component] = entrances.manage(plan, environment, bundle, component, link,
-                                                                   replace=on_conflict == "replace")
-                record["entrance"] = link
+                report["entrances"][component] = entrances.attach(plan, environment, bundle, component, record, link,
+                                                                  replace=on_conflict == "replace")
         record = state["components"].get(component)
         installed = bool(record) and not record.get("reused")
         conflicts = []

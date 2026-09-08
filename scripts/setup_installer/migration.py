@@ -11,7 +11,7 @@ from .discovery import reuse_candidate
 from .environment import Environment, find_codex
 from .installer import read_state
 from . import entrances
-from .transaction import Plan, read_regular
+from .transaction import Plan
 
 
 def migrate(environment: Environment, bundle: Bundle, components: list[str], source_scope: str,
@@ -20,7 +20,8 @@ def migrate(environment: Environment, bundle: Bundle, components: list[str], sou
     if source_scope not in {"project", "user"} or target_scope not in {"project", "user"} or source_scope == target_scope:
         raise ValueError("Migration requires distinct --from project/user and --to project/user")
     source, destination = replace(environment, scope=source_scope), replace(environment, scope=target_scope)
-    source_state, destination_state = read_state(source), read_state(destination)
+    plan = Plan()
+    source_state, destination_state = read_state(source, plan), read_state(destination, plan)
     selected = list(bundle.components) if "all" in components else list(dict.fromkeys(components))
     report: dict[str, Any] = {"action": "migrate", "from": source_scope, "to": target_scope, "dry_run": dry_run,
               "codex": find_codex(codex), "components": selected, "entrances": {},
@@ -28,7 +29,6 @@ def migrate(environment: Environment, bundle: Bundle, components: list[str], sou
                          if source_scope == "user" else "The destination user scope makes capabilities visible to other projects.")}
     if "delegation" in selected:
         destination.require_agents_enabled()
-    plan = Plan()
     removals = []
     for component in selected:
         record = source_state["components"].get(component)
@@ -42,11 +42,11 @@ def migrate(environment: Environment, bundle: Bundle, components: list[str], sou
         for target, expected in record["files"].items():
             validate_target(component, target)
             source_path, target_path = source.target(target), destination.target(target)
-            content = read_regular(source_path)
+            content = plan.read(source_path)
             if content is None or digest(content) != expected:
                 encoded = record.get("contents", {}).get(target)
                 raise ConflictError(source_path, base64.b64decode(encoded) if encoded else None, content, content)
-            current = read_regular(target_path)
+            current = plan.read(target_path)
             if current is not None:
                 raise ConflictError(target_path, None, current, content, owned=False)
             plan.add(target_path, content)

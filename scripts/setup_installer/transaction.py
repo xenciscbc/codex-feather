@@ -66,19 +66,26 @@ def atomic_write(path: Path, content: bytes, mode: int = 0o600) -> None:
 class Plan:
     def __init__(self):
         self.changes: list[Change] = []
+        self.baselines: dict[Path, tuple[bytes | None, int]] = {}
+
+    def _baseline(self, path: Path) -> tuple[bytes | None, int]:
+        if path not in self.baselines:
+            before = read_regular(path)
+            mode = stat.S_IMODE(path.stat().st_mode) if before is not None else 0o600
+            self.baselines[path] = (before, mode)
+        return self.baselines[path]
 
     def add(self, path: Path, content: bytes | None) -> None:
         self.changes = [change for change in self.changes if change.path != path]
-        before = read_regular(path)
+        before, mode = self._baseline(path)
         if before != content:
-            mode = stat.S_IMODE(path.stat().st_mode) if before is not None else 0o600
             self.changes.append(Change(path, before, content, mode))
 
     def read(self, path: Path) -> bytes | None:
         for change in self.changes:
             if change.path == path:
                 return change.after
-        return read_regular(path)
+        return self._baseline(path)[0]
 
     def summary(self) -> list[dict]:
         return [{"path": str(change.path), "action": "remove" if change.after is None else "write"}

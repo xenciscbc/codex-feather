@@ -65,6 +65,15 @@ def inspect(environment: Environment, component: str, link: dict[str, str]) -> d
             "load_condition": "Codex document limits, deeper instructions and project trust still apply"}
 
 
+def attach(plan: Plan, environment: Environment, bundle: Bundle, component: str, record: dict,
+           link: dict[str, str], replace: bool = False) -> dict:
+    if record.get("entrance") and record["entrance"] != link:
+        raise ValueError("Existing entrance is in another scope; remove it explicitly before changing scope")
+    result = manage(plan, environment, bundle, component, link, replace=replace)
+    record["entrance"] = link
+    return result
+
+
 def manage(plan: Plan, environment: Environment, bundle: Bundle, component: str,
            link: dict[str, str], remove: bool = False, replace: bool = False,
            transfer_to: Environment | None = None) -> dict:
