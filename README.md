@@ -95,3 +95,9 @@ python scripts/trial.py verify .scratch/feather-mvp/runs/my-scout
 檢查同名角色、同層 `AGENTS.override.md`、專案 `.codex/agents/` 與生效指令優先順序；發現衝突使用新隔離目錄，不覆寫既有配置。角色檔的 model/reasoning 是原生綁定，指令中的模型文字不能替代它。即時權限覆寫可能覆蓋角色 sandbox，混合可寫／唯讀情境須檢阅實際權限和副作用。
 
 未提供安裝器、遷移、發布、hook 或持久工作流引擎。實作與尚待真實測試的項目見 [驗證紀錄](docs/validation.md)。
+
+## 工作交接
+
+獨立的 [feather-handoff skill](skills/feather-handoff/SKILL.md) 以精簡 Markdown 保存同專案的工作進度，支援讀取、接續、完成歸入共同歷史，以及按明確要求清除歷史。交接資料預設 Git 忽略，尊重使用者的追蹤選擇。
+
+本次不插入專案 AGENTS.md 入口；可選設定留給另行設計的 feather-setup。使用方式與隔離驗收見 [交接說明](docs/handoff.md)。

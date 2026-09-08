@@ -10,6 +10,9 @@ import sys
 import time
 import tomllib
 from scenarios import ROLES, SCENARIOS, EXECUTOR_CHECK
+import handoff_trials
+
+SCENARIOS = {**SCENARIOS, **handoff_trials.SCENARIOS}
 
 ROOT = Path(__file__).resolve().parents[1]
 EXPECTED = {"role": "scout", "model": "gpt-5.6-luna", "reasoning": "low"}
@@ -19,26 +22,30 @@ def write_json(path, value):
     path.write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
-def hashes(directory):
+def hashes(directory, exclude_git=False):
     return {p.relative_to(directory).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
-            for p in sorted(directory.rglob("*")) if p.is_file()}
+            for p in sorted(directory.rglob("*"))
+            if p.is_file() and (not exclude_git or ".git" not in p.relative_to(directory).parts)}
 
 
 def prepare(trial, scenario="scout"):
     # Exclusive creation prevents overwriting a previous run or a real Codex home.
     trial.mkdir(parents=True, exist_ok=False)
     (trial / "home/agents").mkdir(parents=True)
-    shutil.copytree(ROOT / "tests/fixtures" / scenario, trial / "workspace",
+    shutil.copytree(ROOT / "tests/fixtures" / SCENARIOS[scenario].get("fixture", scenario), trial / "workspace",
                     ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     for role in ROLES:
         shutil.copy2(ROOT / "templates" / f"{role}.toml", trial / "home/agents" / f"{role}.toml")
-    shutil.copy2(ROOT / "templates/AGENTS.md", trial / "workspace/AGENTS.md")
+    if scenario in handoff_trials.SCENARIOS:
+        handoff_trials.prepare(trial, scenario)
+    else:
+        shutil.copy2(ROOT / "templates/AGENTS.md", trial / "workspace/AGENTS.md")
     (trial / "workspace/.feather-root").touch()
     (trial / "home/config.toml").write_text('project_root_markers = [".feather-root"]\n\n[agents]\nenabled = true\n', encoding="utf-8")
     (trial / "prompt.txt").write_text(SCENARIOS[scenario]["prompt"], encoding="utf-8")
     write_json(trial / "manifest.json", {
         "format": 2, "scenario": scenario, "expected": EXPECTED if scenario == "scout" else SCENARIOS[scenario]["roles"], "actual": "unconfirmed",
-        "workspace_before": hashes(trial / "workspace"),
+        "workspace_before": hashes(trial / "workspace", exclude_git=scenario.startswith("handoff-git-")),
     })
     write_json(trial / "review.json", {
         "scenario": scenario, "criteria": SCENARIOS[scenario]["review"],
@@ -51,6 +58,8 @@ def check(trial, pristine=True):
     manifest = json.loads((trial / "manifest.json").read_text(encoding="utf-8"))
     if manifest.get("format") != 2 or manifest.get("scenario") not in SCENARIOS:
         raise ValueError("Unsupported trial manifest; prepare a fresh trial")
+    if manifest["scenario"] in handoff_trials.SCENARIOS:
+        handoff_trials.check(trial)
     configured = {}
     for name, (model, effort, sandbox) in ROLES.items():
         role = tomllib.loads((trial / "home/agents" / f"{name}.toml").read_text(encoding="utf-8"))
@@ -64,7 +73,7 @@ def check(trial, pristine=True):
     config = tomllib.loads((trial / "home/config.toml").read_text(encoding="utf-8"))
     if config != {"project_root_markers": [".feather-root"], "agents": {"enabled": True}}:
         raise ValueError("Trial config changed: main preferences must be supplied only for this run")
-    changed = hashes(trial / "workspace") != manifest["workspace_before"]
+    changed = hashes(trial / "workspace", exclude_git=manifest["scenario"].startswith("handoff-git-")) != manifest["workspace_before"]
     result = {"static": "pass", "configured": configured, "workspace_unchanged": not changed,
               "actual": "unconfirmed", "behavior": "requires native run and manual review"}
     if changed and pristine:
@@ -78,11 +87,16 @@ def verify(trial):
     result = check(trial, pristine=False)
     manifest = json.loads((trial / "manifest.json").read_text(encoding="utf-8"))
     scenario = manifest["scenario"]
-    before, after = manifest["workspace_before"], hashes(trial / "workspace")
+    exclude_git = scenario.startswith("handoff-git-")
+    before, after = manifest["workspace_before"], hashes(trial / "workspace", exclude_git=exclude_git)
     changes = {p for p in before.keys() | after.keys() if before.get(p) != after.get(p)}
     unexpected = changes - set(SCENARIOS[scenario]["writes"])
+    if scenario == "handoff-name":
+        unexpected -= handoff_trials.new_handoffs(before, after)
     if unexpected:
         raise ValueError(f"Changes outside ownership scope: {sorted(unexpected)}")
+    if scenario in handoff_trials.SCENARIOS:
+        handoff_trials.verify(trial, scenario)
     workspace = trial / "workspace"
     if scenario == "mech":
         for region, retries in [("east", 2), ("west", 3)]:
@@ -98,7 +112,7 @@ def verify(trial):
         if (workspace / "output/summary.txt").read_text(encoding="utf-8") != "7319\nVERIFIED\n":
             raise ValueError("Coordination result must be 7319 followed by VERIFIED")
     # Verify only artifacts. A correct artifact cannot establish role choice or execution identity.
-    if hashes(workspace) != after:
+    if hashes(workspace, exclude_git=exclude_git) != after:
         raise ValueError("Behavior validation itself changed workspace files")
     result.update(artifacts="pass", changed_files=sorted(changes),
                   review_criteria=SCENARIOS[scenario]["review"])
