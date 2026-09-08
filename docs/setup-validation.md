@@ -1,5 +1,7 @@
 # feather-setup 驗證紀錄
 
+後續真實使用驗收：最終 Windows 包已安裝至另一個 Codex 專案，四個全新 app session 的交接／歷史流程通過，詳見 [跨專案新 session 實測](handoff-live-validation.md)。此補驗未修改已交付壓縮包。
+
 對應規格：[Feather 獨立安裝器](../.scratch/feather-setup/spec.md)，實作票券 01–08。驗收由公開 CLI／互動输入出發，比對退出結果、摘要、原始檔案與設定，不以內部函式名稱作為正確性證據。
 
 ## 實測環境
