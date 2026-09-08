@@ -120,6 +120,11 @@ SCENARIOS["handoff-archive-same-name"] = {
     "review": "Preserve the earlier config-audit record with its distinct completion time while appending "
               "the newly completed work. Verify both records and normal readback-before-removal order.",
 }
+SCENARIOS["handoff-archive-first"] = {
+    **SCENARIOS["handoff-archive"],
+    "review": "Shared history is initially absent. Create it, preserve the complete final handoff, "
+              "read back the saved record, and only then remove the matching original. Preserve other work.",
+}
 HISTORY_ACTIONS = {
     "history-missing": ("Read the deploy-production history record; only report it.",
                         "Report no matching history without inventing progress or changing any records."),
@@ -247,7 +252,10 @@ def verify(trial, scenario):
     if scenario.startswith("handoff-archive"):
         history = workspace / HISTORY
         content = history.read_text(encoding="utf-8") if history.is_file() else ""
-        prefix = OLD_HISTORY + EARLIER_RECORD if scenario == "handoff-archive-same-name" else OLD_HISTORY
+        if scenario == "handoff-archive-first":
+            prefix = "# 交接歷史\n"
+        else:
+            prefix = OLD_HISTORY + EARLIER_RECORD if scenario == "handoff-archive-same-name" else OLD_HISTORY
         if not content.startswith(prefix):
             raise ValueError("Archive must preserve existing history")
         if scenario == "handoff-archive-remove-failure":

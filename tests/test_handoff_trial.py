@@ -293,5 +293,22 @@ class HandoffTrialTest(unittest.TestCase):
             self.assertIn("metadata", result.stderr)
 
 
+    def test_first_archive_creates_shared_history_before_removing_work(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            trial = Path(temporary) / "trial"
+            result = self.run_trial("prepare", trial, "--scenario", "handoff-archive-first")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            directory = trial / "workspace/.feather/handoffs"
+            history = directory / "history.md"
+            self.assertFalse(history.exists())
+            original = (directory / "config-audit.md").read_text(encoding="utf-8")
+            (directory / "config-audit.md").unlink()
+            self.assertNotEqual(self.run_trial("verify", trial).returncode, 0)
+            history.write_text("# 交接歷史\n\n## config-audit · 完成：2026-09-08T12:00:00+08:00\n" +
+                               original.split("\n", 1)[1].replace("狀態：進行中", "狀態：完成") +
+                               "\n進度補充：已核對 /ready；未測試。\n", encoding="utf-8")
+            self.assertEqual(self.run_trial("verify", trial).returncode, 0)
+
+
 if __name__ == "__main__":
     unittest.main()
