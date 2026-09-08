@@ -2,6 +2,12 @@
 
 輕量 Codex 分工規則、四個原生角色模板及隔離驗收入口。六張待辦的實作內容已交付；真實模型派工／綁定仍需明確啟用測試，不能以靜態檢查取代。
 
+## 正式安裝
+
+`feather-setup` 提供 Windows x64／Linux x64 的完整離線發行包，不要求使用者另裝 Python。可選任務分工、交接或整套，支援專案／使用者範圍，以及獨立選擇的入口宣告。直接啟動會提供引導；命令模式支援檢查、預覽、安裝、更新、移除與明確遷移。
+
+操作、衝突及復原方式見 [安裝器說明](docs/setup.md)，平台與原生 Codex 載入證據見 [安裝器驗證紀錄](docs/setup-validation.md)。本機二進位建置輸出在 `dist/`；發布位置需由維護者另行提供。
+
 ## 角色與規則
 
 | 工作 | 角色 | 預期模型 / reasoning |
@@ -75,7 +81,7 @@ python scripts/trial.py smoke .scratch/feather-mvp/runs/my-scout --codex $feathe
 python scripts/trial.py verify .scratch/feather-mvp/runs/my-scout
 ```
 
-`check` 檢查四角色配置及原始素材未變；`verify` 容許情境指定的寫入，檢查範圍外的新增／刪除／修改，並驗證批次結果、工程函式行為、協調檔案內容。executor 的 verify 會在子 Python 程序中執行生成的 retry.py；這是程式測試，不是模型呼叫。Python 編譯檢查是語法檢查，並非型別檢查；本專案未配置獨立型別檢查器。
+`check` 檢查四角色配置及原始素材未變；`verify` 容許情境指定的寫入，檢查範圍外的新增／刪除／修改，並驗證批次結果、工程函式行為、協調檔案內容。executor 的 verify 會在子 Python 程序中執行生成的 retry.py；這是程式測試，不是模型呼叫。Python 編譯檢查是語法檢查，並非型別檢查；安裝器另外執行 mypy，既有試用工具的驗收方式維持不變。
 
 所有唯讀／創作／分析答案及派工行為仍由 `review.json` 準則檢閱原生事件與最終回覆。`artifacts: pass` 只表示檔案成果通過，不能證明選角正確、從未寫入後還原、工作是否並行或模型綁定。
 
@@ -94,10 +100,10 @@ python scripts/trial.py verify .scratch/feather-mvp/runs/my-scout
 
 檢查同名角色、同層 `AGENTS.override.md`、專案 `.codex/agents/` 與生效指令優先順序；發現衝突使用新隔離目錄，不覆寫既有配置。角色檔的 model/reasoning 是原生綁定，指令中的模型文字不能替代它。即時權限覆寫可能覆蓋角色 sandbox，混合可寫／唯讀情境須檢阅實際權限和副作用。
 
-未提供安裝器、遷移、發布、hook 或持久工作流引擎。實作與尚待真實測試的項目見 [驗證紀錄](docs/validation.md)。
+安裝與遷移使用 [feather-setup](docs/setup.md)；不提供 hook 或持久工作流引擎。分工實作與尚待真實模型測試的項目見 [驗證紀錄](docs/validation.md)。
 
 ## 工作交接
 
 獨立的 [feather-handoff skill](skills/feather-handoff/SKILL.md) 以精簡 Markdown 保存同專案的工作進度，支援讀取、接續、完成歸入共同歷史，以及按明確要求清除歷史。交接資料預設 Git 忽略，尊重使用者的追蹤選擇。
 
-本次不插入專案 AGENTS.md 入口；可選設定留給另行設計的 feather-setup。使用方式與隔離驗收見 [交接說明](docs/handoff.md)。
+可由 feather-setup 選擇是否加入入口，以及入口的專案／使用者範圍。交接使用方式與隔離驗收見 [交接說明](docs/handoff.md)。

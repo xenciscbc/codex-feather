@@ -2,3 +2,8 @@ __pycache__/
 .scratch/feather-mvp/runs/
 .scratch/feather-mvp/native-schema/
 .scratch/feather-handoff/runs/
+.scratch/feather-setup/runs/
+.scratch/feather-setup/build/
+.scratch/feather-setup/preexisting.patch
+.scratch/feather-setup/baselines/
+dist/
