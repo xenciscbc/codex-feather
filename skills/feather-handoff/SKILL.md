@@ -1,6 +1,6 @@
 ---
 name: feather-handoff
-description: "Handoff: save progress, read or resume recorded work, and inspect or clear completed history. Maintain active handoffs at milestones; leave unrelated tasks untouched."
+description: "Handoff: save progress, read or resume recorded work, search or manage completed history, and find handoff records in explicitly specified Claude memory. Maintain active handoffs at milestones."
 ---
 
 # Feather Handoff
@@ -34,6 +34,8 @@ Keep the existing on-disk schema for compatibility. Write field values and user-
 Choose one status. Save and verify using the write discipline above. Report the path and status; when the entire work is complete, archive it below.
 
 ## Read or resume
+
+When the user explicitly requests Claude memory, follow [Read Claude memory](references/claude-memory.md) and return its read-only results. Ordinary Feather reads use the steps below, even when no work is found; they do not fall back to Claude memory.
 
 1. On a read/resume request, list work files excluding `history.md`; use titles and status to select. Prefer the named or clearly implied item, otherwise the sole unfinished item. If several remain, ask which; timestamps are not a selection rule. Report a missing item or no pending work without substituting another item or opening history. Explicitly requested completed work may be read.
 2. **Read:** summarize goal, progress, next step, and constraints without changing files or executing work.

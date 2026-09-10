@@ -11,8 +11,12 @@ import time
 import tomllib
 from scenarios import ROLES, SCENARIOS, EXECUTOR_CHECK
 import handoff_trials
+import claude_memory_trials
+import claude_memory_link_trials
 
-SCENARIOS = {**SCENARIOS, **handoff_trials.SCENARIOS}
+HANDOFF_FAMILIES = (handoff_trials, claude_memory_trials, claude_memory_link_trials)
+HANDOFF_SCENARIOS = {name: family for family in HANDOFF_FAMILIES for name in family.SCENARIOS}
+SCENARIOS = {**SCENARIOS, **{name: family.SCENARIOS[name] for name, family in HANDOFF_SCENARIOS.items()}}
 
 ROOT = Path(__file__).resolve().parents[1]
 EXPECTED = {"role": "scout", "model": "gpt-5.6-luna", "reasoning": "low"}
@@ -36,8 +40,11 @@ def prepare(trial, scenario="scout"):
                     ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     for role in ROLES:
         shutil.copy2(ROOT / "templates" / f"{role}.toml", trial / "home/agents" / f"{role}.toml")
-    if scenario in handoff_trials.SCENARIOS:
+    family = HANDOFF_SCENARIOS.get(scenario)
+    if family:
         handoff_trials.prepare(trial, scenario)
+        if family is not handoff_trials:
+            family.prepare(trial, scenario)
     else:
         shutil.copy2(ROOT / "templates/AGENTS.md", trial / "workspace/AGENTS.md")
     (trial / "workspace/.feather-root").touch()
@@ -58,8 +65,12 @@ def check(trial, pristine=True):
     manifest = json.loads((trial / "manifest.json").read_text(encoding="utf-8"))
     if manifest.get("format") != 2 or manifest.get("scenario") not in SCENARIOS:
         raise ValueError("Unsupported trial manifest; prepare a fresh trial")
-    if manifest["scenario"] in handoff_trials.SCENARIOS:
+    family = HANDOFF_SCENARIOS.get(manifest["scenario"])
+    if family:
         handoff_trials.check(trial)
+        check_family = getattr(family, "check", None)
+        if family is not handoff_trials and check_family:
+            check_family(trial)
     configured = {}
     for name, (model, effort, sandbox) in ROLES.items():
         role = tomllib.loads((trial / "home/agents" / f"{name}.toml").read_text(encoding="utf-8"))
@@ -95,8 +106,9 @@ def verify(trial):
         unexpected -= handoff_trials.new_handoffs(before, after)
     if unexpected:
         raise ValueError(f"Changes outside ownership scope: {sorted(unexpected)}")
-    if scenario in handoff_trials.SCENARIOS:
-        handoff_trials.verify(trial, scenario)
+    family = HANDOFF_SCENARIOS.get(scenario)
+    if family:
+        family.verify(trial, scenario)
     workspace = trial / "workspace"
     if scenario == "mech":
         for region, retries in [("east", 2), ("west", 3)]:

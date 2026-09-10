@@ -1,4 +1,5 @@
 __pycache__/
+.scratch/claude-memory-handoff/runs/
 .scratch/feather-mvp/runs/
 .scratch/feather-mvp/native-schema/
 .scratch/feather-handoff/runs/
