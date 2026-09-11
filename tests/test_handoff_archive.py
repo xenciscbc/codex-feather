@@ -104,6 +104,36 @@ class HandoffArchiveTest(unittest.TestCase):
         self.assertEqual(self.work.read_bytes(), before_work)
         self.assertEqual(history.read_bytes(), history_data)
 
+    def test_same_identity_with_an_extra_newline_at_eof_is_a_body_conflict(self):
+        body = (f"更新：{COMPLETED}\n狀態：完成\n目標：核對設定\n"
+                "進度：完成\n下一步：無").encode("utf-8")
+        work = f"# {TITLE}\n".encode("utf-8") + body
+        version = self.write_work(work)
+        history = self.directory / "history.md"
+        history_data = (f"# 交接歷史\n\n## {TITLE} · 完成：{COMPLETED}\n".encode("utf-8")
+                        + body + b"\n")
+        history.write_bytes(history_data)
+        result = self.run_archive(version, expected=2)
+        self.assertEqual(result["code"], "conflict")
+        self.assertEqual(self.work.read_bytes(), work)
+        self.assertEqual(history.read_bytes(), history_data)
+
+    def test_retry_accepts_only_the_separator_needed_for_a_following_entry(self):
+        body = (f"更新：{COMPLETED}\n狀態：完成\n目標：核對設定\n"
+                "進度：完成\n下一步：無").encode("utf-8")
+        work = f"# {TITLE}\n".encode("utf-8") + body
+        version = self.write_work(work)
+        history = self.directory / "history.md"
+        history_data = (f"# 交接歷史\n\n## {TITLE} · 完成：{COMPLETED}\n".encode("utf-8")
+                        + body
+                        + b"\n## later \xc2\xb7 \xe5\xae\x8c\xe6\x88\x90\xef\xbc\x9a2026-09-12T00:00:00+00:00\n"
+                          b"later body\n")
+        history.write_bytes(history_data)
+        result = self.run_archive(version)
+        self.assertFalse(result["history_appended"])
+        self.assertFalse(self.work.exists())
+        self.assertEqual(history.read_bytes(), history_data)
+
     def test_noncompleted_work_and_unrecognizable_history_are_preserved(self):
         active = WORK.replace("狀態：完成".encode(), "狀態：進行中".encode())
         version = self.write_work(active)

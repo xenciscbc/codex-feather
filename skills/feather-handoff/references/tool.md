@@ -21,13 +21,15 @@ Use `create --work <work>.md` with one UTF-8 JSON object on stdin. Supply `title
 
 The Agent writes `progress` as one or two concise sentences with concrete findings and the main pending work. Preserve full evidence and constraints in the other fields/details. The tool validates structure, not truthfulness or semantic completeness. Use structured stdin or a UTF-8 input file; never concatenate user text into shell code.
 
-`tracking` may be `default` or `track`; it respects existing tracking and effective ignore rules. The tool does not stage or commit. A tracking error after creation reports that the work was saved: inspect the surviving file instead of retrying create over it.
+`tracking` may be `default` or `track`; it respects existing tracking and effective ignore rules. The tool does not stage or commit. A tracking failure after create/update returns `status: partial`, `code: tracking-failed`, `work_path`, `saved_version`, and the observed `state`; when readable, `version` identifies the current work. Inspect the surviving work and Git rules. After resolving the tracking issue, retry update with the current version, or archive a completed work; never repeat create over the saved file.
 
 The tool is not a lock or a cross-session transaction system. Keep one writer for a work item and serialize all shared-history operations externally. A content version check does not close the gap between checking and writing.
 
 ## Update and completion
 
 Use `update --work <work>.md` with `{ "version": "<read version>", "fields": { "progress": "...", "next": "..." } }`. Optional `title` and `details` replace only those requested values; other fields and manual sections remain. Read the complete work first. Preserve evidence when replacing details. An empty/multiline legacy field or duplicate field needs an explicitly reviewed full `replacement` string plus `version`, without partial fields. This is for authorized, semantically clear normalization; ask about ambiguous content before submitting it. Read-only requests never normalize files.
+
+The managed details section ends at the next heading of the same or higher level, preserving siblings such as `## 詳細紀錄補充`. Duplicate exact `## 詳細紀錄` headings require a reviewed replacement instead of an ambiguous partial edit. Updating the managed heading preserves its existing LF/CRLF line ending.
 
 Every normal create/update with `status: 完成` saves the final work and automatically archives it. Its zoned `updated` value is the completion identity; do not reset it on retry. If another session is known to be writing shared history, use `defer_history: true` to retain the completed work for a coordinated retry. Use `archive --work <work>.md` with `{ "version": "<current read version>" }` to retry an already completed work. The tool verifies saved history before checking and removing the identical work source. Preserve and report conflicts, pending work paths and any surviving history; do not retry create or modify completion identity to bypass a failure.
 

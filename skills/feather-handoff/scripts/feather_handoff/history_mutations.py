@@ -67,8 +67,8 @@ def clear_history(store: Store, raw: object) -> dict:
             "removed": [e.identity for e in entries], "version": saved.version}
 
 
-def check_pending(store: Store, entries: list[HistoryEntry]) -> None:
-    from .archiving import work_body
+def check_pending(store: Store, entries: list[HistoryEntry], document: HistoryDocument) -> None:
+    from .archiving import same_body, work_body
     from .records import summary
     paths = store.work_paths()
     snapshots = []
@@ -83,7 +83,7 @@ def check_pending(store: Store, entries: list[HistoryEntry]) -> None:
                 if (item["status"] == "完成" and item["title"] == entry.title
                         and item["updated"] == entry.completed):
                     body = work_body(snapshot, item["title"])
-                    if entry.body_bytes not in (body, body + b"\n"):
+                    if not same_body(entry, body, document):
                         raise HandoffError("conflict", f"Completed work and history differ: {path}")
                     raise HandoffError("pending-archive", f"Retry archival before sealing: {path}")
         except (OSError, UnicodeError) as error:
@@ -126,10 +126,11 @@ def seal_history(store: Store, raw: object) -> dict:
     else:
         entries = selection(document, payload.get("ids"))
         target_entries = entries
+        target_document = document
         candidate = "# 交接歷史\n\n".encode("utf-8") + b"".join(e.content_bytes for e in entries)
         if existing is not None and existing.data != candidate:
             raise HandoffError("conflict", f"Different destination preserved: {destination}")
-    check_pending(store, target_entries)
+    check_pending(store, target_entries, target_document)
     saved = existing
     try:
         if saved is None:
@@ -137,7 +138,7 @@ def seal_history(store: Store, raw: object) -> dict:
         require_current(saved)
         if read_file(destination).data != candidate:
             raise HandoffError("conflict", "Destination verification failed")
-        check_pending(store, target_entries)
+        check_pending(store, target_entries, target_document)
         source = replace_file(original, remainder(document, entries))
         require_current(saved)
         require_current(source)

@@ -34,9 +34,14 @@ def _matching(document: HistoryDocument, title: str, completed: str) -> list[His
             if entry.title == title and entry.completed == completed]
 
 
-def _same_body(entry: HistoryEntry, body: bytes) -> bool:
-    # A newline inserted solely to frame a following heading is not part of the archived work body.
-    return entry.body_bytes == body or entry.body_bytes == body + b"\n"
+def same_body(entry: HistoryEntry, body: bytes, document: HistoryDocument) -> bool:
+    """Compare an archived body, allowing only a newline that frames a following entry."""
+    if entry.body_bytes == body:
+        return True
+    if body.endswith(b"\n") or entry.body_bytes != body + b"\n":
+        return False
+    return any(candidate.byte_start == entry.byte_end for candidate in document.entries
+               if candidate is not entry)
 
 
 def _validated_document(snapshot: Snapshot) -> HistoryDocument:
@@ -93,7 +98,7 @@ def archive_work(store: Store, name: str, raw: object) -> dict:
         if len(matches) > 1:
             raise HandoffError("conflict", f"Duplicate completion identity in {history_path}; all data was preserved")
         if matches:
-            if not _same_body(matches[0], body):
+            if not same_body(matches[0], body, document):
                 raise HandoffError("conflict", f"Completion identity has a different body in {history_path}; all data was preserved")
             saved = existing
             appended = False
@@ -143,7 +148,7 @@ def archive_work(store: Store, name: str, raw: object) -> dict:
         return _pending(work, history_path, "history-verify-failed", str(error), identity,
                         title, completed, saved, appended)
     matches = _matching(verified, title, completed)
-    if len(matches) != 1 or not _same_body(matches[0], body):
+    if len(matches) != 1 or not same_body(matches[0], body, verified):
         return _pending(work, history_path, "history-verify-failed",
                         "Saved history did not contain exactly the completed body", identity,
                         title, completed, verified.snapshot, appended)

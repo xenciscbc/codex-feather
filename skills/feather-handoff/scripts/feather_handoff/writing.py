@@ -1,6 +1,7 @@
 """Validated handoff mutations; content decisions remain with the user and Agent."""
 from datetime import datetime
 import re
+import subprocess
 
 from .records import FIELDS, REQUIRED, STATUSES, read_work, summary, valid_time
 from .storage import HandoffError, Snapshot, Store, create_file, read_file, replace_file
@@ -55,8 +56,7 @@ def create_work(store: Store, name: str, raw: object) -> dict:
     if "details" in payload:
         content += "\n## 詳細紀錄\n" + text_value(payload["details"], "details", multiline=True).rstrip("\n") + "\n"
     create_file(path, content.encode("utf-8"))
-    tracked = ensure_tracking(store, name, tracking)
-    return finish_save(store, name, tracked, payload)
+    return finish_save(store, name, tracking, payload)
 
 
 def update_work(store: Store, name: str, raw: object) -> dict:
@@ -105,11 +105,17 @@ def update_work(store: Store, name: str, raw: object) -> dict:
         content = header + tail
         if "details" in payload:
             details = text_value(payload["details"], "details", multiline=True)
-            heading = re.search(r"(?m)^## 詳細紀錄[ \t]*\r?$", content)
-            if heading:
-                following = re.search(r"(?m)^## (?!詳細紀錄)", content[heading.end():])
+            headings = list(re.finditer(r"(?m)^## 詳細紀錄[ \t]*(?:\r?\n|$)", content))
+            if len(headings) > 1:
+                raise HandoffError("format", "Duplicate 詳細紀錄 sections require an explicit reviewed replacement")
+            if headings:
+                heading = headings[0]
+                following = re.search(r"(?m)^#{1,2}[ \t]+", content[heading.end():])
                 boundary = heading.end() + following.start() if following else len(content)
-                content = content[:heading.end()] + newline + details.rstrip("\r\n") + newline + content[boundary:]
+                prefix = content[:heading.end()]
+                if not prefix.endswith("\n"):
+                    prefix += newline
+                content = prefix + details.rstrip("\r\n") + newline + content[boundary:]
             else:
                 content = content.rstrip("\r\n") + newline * 2 + "## 詳細紀錄" + newline + details.rstrip("\r\n") + newline
     data = content.encode("utf-8")
@@ -122,16 +128,32 @@ def update_work(store: Store, name: str, raw: object) -> dict:
     if not isinstance(tracking, str) or tracking not in {"default", "track"}:
         raise HandoffError("input", "tracking must be default or track")
     replace_file(original, data)
-    tracked = ensure_tracking(store, name, tracking)
-    return finish_save(store, name, tracked, payload)
+    return finish_save(store, name, tracking, payload)
 
 
-def finish_save(store: Store, name: str, tracked: str, payload: dict) -> dict:
-    result = {**read_work(store, name), "tracking": tracked}
+def finish_save(store: Store, name: str, tracking: str, payload: dict) -> dict:
+    result = read_work(store, name)
+    try:
+        result["tracking"] = ensure_tracking(store, name, tracking)
+    except (OSError, ValueError, subprocess.TimeoutExpired) as error:
+        observed = {}
+        state = "unreadable"
+        try:
+            observed = read_work(store, name)
+            state = "saved" if observed["version"] == result["version"] else "changed"
+        except FileNotFoundError:
+            state = "missing"
+        except (OSError, ValueError):
+            pass
+        return {**observed, "status": "partial", "complete": False, "code": "tracking-failed",
+                "cause_code": getattr(error, "code", "io"), "message": str(error), "state": state,
+                "work": name, "work_path": str(store.directory / name), "saved_version": result["version"],
+                "tracking": "error",
+                "recovery": "Work was saved before tracking failed; inspect the reported work and Git rules, then retry update with the current version or archive completed work. Do not repeat create."}
     if result["work_status"] == "完成":
         if payload.get("defer_history"):
             return {**result, "status": "partial", "complete": False, "code": "deferred",
                     "message": "Completed work saved; shared history deferred for coordinated retry"}
         from .archiving import archive_work
-        return {**archive_work(store, name, {"version": result["version"]}), "tracking": tracked}
+        return {**archive_work(store, name, {"version": result["version"]}), "tracking": result["tracking"]}
     return result

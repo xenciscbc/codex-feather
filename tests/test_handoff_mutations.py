@@ -89,6 +89,19 @@ class HistoryMutationsTest(unittest.TestCase):
         self.assertTrue(result["complete"])
         self.assertEqual(history.read_bytes(), "# 交接歷史\n\n".encode())
 
+    def test_seal_reports_different_trailing_body_bytes_as_conflict(self):
+        work = self.write_work(content=RECORD.replace("狀態：進行中", "狀態：完成"))
+        body = work.read_bytes().split(b"\n", 1)[1]
+        history = self.write_work("history.md", "# 交接歷史\n\n")
+        history.write_bytes(history.read_bytes() +
+                           "## config-audit · 完成：2026-09-11T10:00:00+08:00\n".encode() + body + b"\n")
+        entry = self.run_tool("history")["entries"][0]
+        before = self.snapshot()
+        result = self.run_tool("seal", payload={"version": entry["document_version"],
+                               "ids": [entry["id"]], "destination": "batch.md"}, expected=2)
+        self.assertEqual(result["code"], "conflict")
+        self.assertEqual(before, self.snapshot())
+
     @unittest.skipUnless(os.name == "nt", "Windows sharing denial is platform-specific")
     def test_failed_clear_and_seal_retain_sources_then_retry_exact_selection(self):
         path, first, second, entries = self.prepare_history()

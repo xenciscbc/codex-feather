@@ -159,6 +159,52 @@ class HandoffToolTest(unittest.TestCase):
             "version": updated["version"], "fields": {"next": "Await timeout decision"}})
         self.assertEqual(final["next"], "Await timeout decision")
 
+    def test_details_update_preserves_sibling_sections_and_crlf_across_retries(self):
+        sibling = "## 詳細紀錄補充\nUNREQUESTED NOTES\n"
+        for newline in ("\n", "\r\n"):
+            with self.subTest(newline=repr(newline)):
+                path = self.write_work(content=(RECORD + sibling).replace("\n", newline))
+                for detail in ("first update", "second update"):
+                    read = self.run_tool("read", "--work", path.name)
+                    self.run_tool("update", "--work", path.name,
+                                  payload={"version": read["version"], "details": detail})
+                    data = path.read_bytes()
+                    self.assertIn(sibling.replace("\n", newline).encode(), data)
+                    self.assertNotIn(b"\r\r\n", data)
+                    self.assertEqual(data.count(("## 詳細紀錄" + newline).encode()), 1)
+
+    def test_duplicate_details_headings_require_reviewed_replacement(self):
+        path = self.write_work(content=RECORD + "## 詳細紀錄\nSECOND MANUAL EVIDENCE\n")
+        before = path.read_bytes()
+        read = self.run_tool("read", "--work", path.name)
+        result = self.run_tool("update", "--work", path.name, payload={
+            "version": read["version"], "details": "new"}, expected=2)
+        self.assertEqual(result["code"], "format")
+        self.assertEqual(path.read_bytes(), before)
+
+    def test_tracking_failure_reports_saved_create_and_update_for_recovery(self):
+        subprocess.run(["git", "init", "--quiet", str(self.project)], check=True, capture_output=True)
+        ignore = self.project / ".gitignore"
+        ignore.write_bytes(b"\xff")
+        fields = {"goal": "Audit", "progress": "Port checked", "next": "Read readiness"}
+        created = self.run_tool("create", "--work", "saved.md", payload={"fields": fields}, expected=2)
+        self.assertEqual(created["status"], "partial")
+        self.assertEqual(created["state"], "saved")
+        self.assertEqual(Path(created["work_path"]), self.directory / "saved.md")
+        read = self.run_tool("read", "--work", "saved.md")
+        self.assertEqual(created["version"], read["version"])
+        self.assertIn("recovery", created)
+        updated = self.run_tool("update", "--work", "saved.md", payload={
+            "version": read["version"], "fields": {"progress": "New evidence retained"}}, expected=2)
+        self.assertEqual(updated["state"], "saved")
+        self.assertNotEqual(updated["version"], read["version"])
+        self.assertEqual(self.run_tool("read", "--work", "saved.md")["progress"], "New evidence retained")
+        self.assertEqual(ignore.read_bytes(), b"\xff")
+        ignore.write_bytes(b"# corrected by user\n")
+        recovered = self.run_tool("update", "--work", "saved.md", payload={
+            "version": updated["version"], "fields": {"next": "Continue audit"}})
+        self.assertEqual(recovered["next"], "Continue audit")
+
 
 if __name__ == "__main__":
     unittest.main()
