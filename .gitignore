@@ -8,3 +8,4 @@ __pycache__/
 .scratch/feather-setup/preexisting.patch
 .scratch/feather-setup/baselines/
 dist/
+.scratch/feather-handoff-tool/live-smoke/

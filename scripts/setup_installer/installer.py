@@ -9,6 +9,7 @@ from .discovery import reuse_candidate
 from .transaction import Plan, read_regular
 from . import entrances
 from .conflicts import ConflictError
+from .handoff_runtime import inspect_python
 
 
 def read_state(environment: Environment, plan: Plan) -> dict:
@@ -140,5 +141,10 @@ def execute(action: str, environment: Environment, bundle: Bundle, components: l
         report["status"] = "attention-required" if any(item["status"] in {"conflict", "missing", "shadowed"}
                                                          for category in ["components", "entrances"]
                                                          for item in report[category].values()) else "ok"
+    if action == "check" and "handoff" in components:
+        runtime = inspect_python()
+        report.setdefault("runtime", {})["python"] = runtime
+        if runtime["status"] in {"missing", "incompatible"}:
+            report["status"] = "attention-required"
     report["_plan_id"] = plan.fingerprint()
     return report

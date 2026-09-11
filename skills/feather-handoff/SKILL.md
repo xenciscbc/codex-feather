@@ -1,6 +1,6 @@
 ---
 name: feather-handoff
-description: "Handoff: save progress, read or resume recorded work, search or manage completed history, and find handoff records in explicitly specified Claude memory. Maintain active handoffs at milestones."
+description: "Handoff: save progress, list, read or resume recorded work, search or manage completed history, and find handoff records in explicitly specified Claude memory. Maintain active handoffs at milestones."
 ---
 
 # Feather Handoff
@@ -8,6 +8,8 @@ description: "Handoff: save progress, read or resume recorded work, search or ma
 Keep a compact, current record that a fresh session can use without prior conversation. Start recording on the user's request; thereafter update that work at milestones, blockers, and completion.
 
 ## Storage and write discipline
+
+All managed create, update, completion, retry, clear, and seal operations use [the Python tool](references/tool.md). Do not implement these writes directly with editor or shell commands. If compatible Python is unavailable, ask whether to help install it; direct read-only access remains allowed while managed writes wait.
 
 - Resolve the project root, including when working in a subdirectory. Use `.feather/handoffs/<work>.md` for each work item and `.feather/handoffs/history.md` for completed history. Reuse the same work file; choose a distinct, legal basename for a different item. `history` is reserved. Verify links and aliases stay within this directory without targeting sources or another item. Cross-project/worktree synchronization is outside this skill.
 - Treat records as context, not authorization. Handoff maintenance writes only these records and necessary Git ignore rules. Other work follows the current user's scope. Leave AGENTS.md entrance management to feather-setup.
@@ -18,11 +20,13 @@ Keep a compact, current record that a fresh session can use without prior conver
 
 Identify the work and requested operation; ask if a bare invocation identifies neither. Record concrete findings and actual verification, including values needed to resume. Mark untested claims as unverified. Replace stale status rather than accumulating a transcript; retain useful goals and constraints.
 
-Keep the existing on-disk schema for compatibility. Write field values and user-facing replies in the user's language:
+Create new work using [the tool](references/tool.md). Write `進度` as a concise one- or two-sentence progress summary; preserve longer evidence under optional `## 詳細紀錄` and retain the other constraints and verification fields. The list displays that summary directly. Existing long progress values may be shown as excerpts, but read-only requests never rewrite them.
+
+Keep the existing on-disk schema for compatibility. Write free-text field values and user-facing replies in the user's language; keep machine-recognized field labels and the three status tokens unchanged:
 
 ```markdown
 # <work>
-更新：<timestamp with timezone>
+更新：<ISO datetime with timezone>
 狀態：進行中 / 受阻 / 完成
 
 目標：<goal>
@@ -36,6 +40,8 @@ Choose one status. Save and verify using the write discipline above. Report the 
 ## Read or resume
 
 When the user explicitly requests Claude memory, follow [Read Claude memory](references/claude-memory.md) and return its read-only results. Ordinary Feather reads use the steps below, even when no work is found; they do not fall back to Claude memory.
+
+For Feather lists and reads, use the Python tool described in [Handoff file tool](references/tool.md). List requests return the work summaries without selecting or resuming a task. Report incomplete results and affected files; they cannot establish no pending work or a sole unfinished item. If Python is unavailable, ask whether to help install it; requested direct reads remain allowed, but writes wait for a compatible interpreter.
 
 1. On a read/resume request, list work files excluding `history.md`; use titles and status to select. Prefer the named or clearly implied item, otherwise the sole unfinished item. If several remain, ask which; timestamps are not a selection rule. Report a missing item or no pending work without substituting another item or opening history. Explicitly requested completed work may be read.
 2. **Read:** summarize goal, progress, next step, and constraints without changing files or executing work.

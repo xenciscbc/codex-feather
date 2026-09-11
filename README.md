@@ -108,3 +108,5 @@ python scripts/trial.py verify .scratch/feather-mvp/runs/my-scout
 獨立的 [feather-handoff skill](skills/feather-handoff/SKILL.md) 以精簡 Markdown 保存同專案的工作進度，支援讀取、接續、完成歸入共同歷史，以及按明確要求清除歷史。交接資料預設 Git 忽略，尊重使用者的追蹤選擇。
 
 可由 feather-setup 選擇是否加入入口，以及入口的專案／使用者範圍。交接使用方式與隔離驗收見 [交接說明](docs/handoff.md)。
+
+交接檔案工具需要 Python 3.11+（僅標準函式庫）；安裝器本身仍不需 Python。缺少時 Agent 先詢問是否協助安裝，可唯讀查閱但不繞過工具寫入。操作與驗收見 [交接工具說明](skills/feather-handoff/references/tool.md) 與 [驗收記錄](docs/handoff-tool-validation.md)。

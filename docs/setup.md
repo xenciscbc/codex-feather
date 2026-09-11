@@ -112,7 +112,7 @@ Windows 原生 Codex 使用 OS 使用者 profile 發現使用者 skills；覆寫
 
 ## 從來源建置
 
-終端使用者不需要 Python；維護者建置需要各平台原生 Python 3.11+ 與依賴。
+安裝器本身不需要 Python；執行交接 skill 的檔案工具需要 Python 3.11+（僅標準函式庫）。缺少或版本不符時，Agent 先詢問是否協助安裝；拒絕後仍可唯讀查閱，但不繞過工具寫入。`check` 會分別回報 Python 與 Codex 環境。維護者建置需要各平台原生 Python 3.11+ 與依賴。
 
 ```powershell
 python -m pip install -r requirements-setup-dev.txt

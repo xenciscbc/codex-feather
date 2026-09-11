@@ -42,7 +42,8 @@ def payload(destination: Path) -> None:
                                             for source in sorted(sources)}}}
     (destination / "bundle.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     (destination / "README.txt").write_text(
-        f"Feather {VERSION}\n\nKeep this complete directory together. No Python installation is required.\n"
+        f"Feather {VERSION}\n\nKeep this complete directory together. The installer requires no Python installation.\n"
+        "The handoff skill's file tool requires Python 3.11+; ask before helping install a missing interpreter.\n"
         "Run feather-setup --help (feather-setup.exe on Windows) for commands.\n"
         "Codex must already be installed. The installer does not install Codex or sign in.\n"
         "The bundle's assets and version manifest are local; no per-component downloads occur.\n",
