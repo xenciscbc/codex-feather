@@ -39,6 +39,7 @@ def remainder(document: HistoryDocument, entries: list[HistoryEntry]) -> bytes:
 
 
 def clear_history(store: Store, raw: object) -> dict:
+    store.require_write_root()
     payload = input_object(raw)
     if set(payload) - {"source", "version", "ids"}:
         raise HandoffError("input", "Unknown clear options")
@@ -95,6 +96,7 @@ def check_pending(store: Store, entries: list[HistoryEntry], document: HistoryDo
 
 
 def seal_history(store: Store, raw: object) -> dict:
+    store.require_write_root()
     payload = input_object(raw)
     if set(payload) - {"version", "ids", "destination", "destination_version"}:
         raise HandoffError("input", "Unknown seal options")

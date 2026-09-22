@@ -143,7 +143,7 @@ class HandoffEnvironmentTest(unittest.TestCase):
                                     text=True, encoding="utf-8", timeout=30)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(installed.read_bytes(), (ROOT / "skills/feather-handoff/scripts/handoff.py").read_bytes())
-            queried = subprocess.run([sys.executable, "-B", str(installed), "--project", str(self.project), "list"],
+            queried = subprocess.run([sys.executable, "-B", str(installed), "--project", str(self.project), "--exact-root", "list"],
                                      capture_output=True, text=True, encoding="utf-8", timeout=15)
             self.assertEqual(queried.returncode, 0, queried.stderr)
         record = self.project / ".feather/handoffs/manual.md"

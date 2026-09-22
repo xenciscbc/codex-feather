@@ -8,14 +8,16 @@ RULE = "/.feather/handoffs/"
 
 
 def git(store: Store, *arguments: str) -> subprocess.CompletedProcess:
-    return subprocess.run(["git", "-c", f"safe.directory={store.project.as_posix()}", "-C",
-                           str(store.project), *arguments], capture_output=True, text=True,
+    return subprocess.run(["git", "-C", str(store.project), *arguments], capture_output=True, text=True,
                           encoding="utf-8", timeout=5, env=git_environment())
 
 
 def ensure_tracking(store: Store, work: str, choice: str) -> str:
     try:
-        if git(store, "rev-parse", "--is-inside-work-tree").stdout.strip() != "true":
+        probe = git(store, "rev-parse", "--is-inside-work-tree")
+        if probe.returncode and "not a git repository" not in probe.stderr.lower():
+            raise HandoffError("git", probe.stderr.strip() or "Git tracking could not be checked")
+        if probe.stdout.strip() != "true":
             return "non-git"
     except (OSError, subprocess.TimeoutExpired):
         return "not-checked"

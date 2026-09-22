@@ -17,6 +17,7 @@ def main() -> int:
         sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description="Feather handoff files (Python 3.11+)")
     parser.add_argument("--project", required=True, help="Existing project directory")
+    parser.add_argument("--exact-root", action="store_true", help="Use --project as the confirmed root without Git discovery")
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("list")
     commands.add_parser("snapshot", help="Read source observations: JSON {paths: [...]} on stdin")
@@ -40,8 +41,9 @@ def main() -> int:
     history.add_argument("--timezone", default="UTC")
     history.add_argument("--include-sealed", action="store_true")
     args = parser.parse_args()
+    store = None
     try:
-        store = Store(args.project)
+        store = Store(args.project, exact_root=args.exact_root)
         if args.command == "snapshot":
             from .observations import capture
             result = capture(store, input_payload())
@@ -72,5 +74,9 @@ def main() -> int:
     except (OSError, UnicodeError, ValueError) as error:
         result = {"status": "error", "complete": False,
                   "code": getattr(error, "code", "io"), "message": str(error)}
+    if store is not None:
+        result["root"] = store.root
+        if store.root["state"] == "uncertain" and result["status"] != "error":
+            result.update(operation_status=result["status"], status="partial", complete=False)
     print(json.dumps(result, ensure_ascii=False))
     return 2 if result["status"] in {"error", "partial"} or (args.command == "compare" and result["status"] == "missing") else 0

@@ -6,6 +6,10 @@ Check an available `python`, `python3` or Windows `py -3` interpreter before inv
 
 ## Read
 
+`--project` normally discovers the Git root from the supplied directory. Once the directory is validated, command output reports `root` with the requested directory, selected `path`, and `state` (`git`, `non-git`, `explicit`, or `uncertain`). An uncertain root also includes the failure `reason`. Read-only operations retain readable results from that path but return `partial`, `complete: false`, exit 2, with the original operation status in `operation_status`; this is not evidence that the project has no pending work. Mutations fail with `project-root-uncertain` before writing anything.
+
+Confirm the intended root from the current workspace and user scope, then use `--project <confirmed-root> --exact-root` before the command to use that directory literally. This bypasses discovery only: it neither changes Git trust nor follows links. It also supports deliberately selected non-Git roots when Git is unavailable. If the root cannot be established from available evidence, ask which project to use rather than creating another handoff under a guessed directory.
+
 ```text
 python -B <skill>/scripts/handoff.py --project <project> list
 python -B <skill>/scripts/handoff.py --project <project> read --work <work>.md

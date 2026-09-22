@@ -39,23 +39,39 @@ def check_path(path: Path) -> None:
             raise HandoffError("unsafe-path", f"Hard-linked file is not supported: {part}")
 
 
-def project_root(value: str) -> Path:
+def resolve_root(value: str, exact: bool = False) -> dict:
     path = Path(os.path.abspath(value))
     check_path(path)
     if not path.is_dir():
         raise HandoffError("project", f"Project directory does not exist: {path}")
+    info = {"requested": str(path), "path": str(path.resolve()), "state": "uncertain"}
+    if exact:
+        return {**info, "state": "explicit"}
     try:
         result = subprocess.run(
             ["git", "-C", str(path),
              "rev-parse", "--show-toplevel"], capture_output=True, text=True,
-            encoding="utf-8", timeout=5, env=git_environment(),
+            encoding="utf-8", errors="replace", timeout=5, env=git_environment(),
         )
         if result.returncode == 0:
             path = Path(result.stdout.strip())
             check_path(path)
-    except (OSError, subprocess.TimeoutExpired):
-        pass
-    return path.resolve()
+            if not path.is_dir():
+                raise HandoffError("project", f"Git root is not a directory: {path}")
+            return {**info, "path": str(path.resolve()), "state": "git"}
+        if "not a git repository" in result.stderr.lower():
+            # A broken .git marker is not evidence of a non-Git project.
+            for ancestor in [path, *path.parents]:
+                try:
+                    (ancestor / ".git").lstat()
+                except FileNotFoundError:
+                    continue
+                break
+            else:
+                return {**info, "state": "non-git"}
+        return {**info, "reason": result.stderr.strip() or "Git root discovery failed"}
+    except (OSError, subprocess.TimeoutExpired) as error:
+        return {**info, "reason": str(error)}
 
 
 def legal_name(name: str) -> None:
@@ -158,10 +174,18 @@ def replace_file(snapshot: Snapshot, data: bytes) -> Snapshot:
 
 
 class Store:
-    def __init__(self, project: str):
-        self.project = project_root(project)
+    def __init__(self, project: str, *, exact_root: bool = False):
+        self.root = resolve_root(project, exact=exact_root)
+        self.project = Path(self.root["path"])
         self.directory = self.project / ".feather" / "handoffs"
         check_path(self.directory)
+
+    def require_write_root(self) -> None:
+        if self.root["state"] == "uncertain":
+            raise HandoffError("project-root-uncertain",
+                               f"Root discovery failed: {self.root['reason']}. No writes made. "
+                               f"Confirm the project root, then use --project <confirmed-root> --exact-root. "
+                               f"Current read scope: {self.project}")
 
     def work_path(self, name: str) -> Path:
         legal_name(name)

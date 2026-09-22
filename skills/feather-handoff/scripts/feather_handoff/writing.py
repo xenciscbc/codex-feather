@@ -43,6 +43,7 @@ def validated_fields(payload: dict, create: bool) -> dict[str, str]:
 
 
 def create_work(store: Store, name: str, raw: object) -> dict:
+    store.require_write_root()
     payload = input_object(raw)
     if set(payload) - {"title", "fields", "details", "tracking", "defer_history", "snapshot"}:
         raise HandoffError("input", "Unknown create options")
@@ -70,6 +71,7 @@ def create_work(store: Store, name: str, raw: object) -> dict:
 
 
 def update_work(store: Store, name: str, raw: object) -> dict:
+    store.require_write_root()
     payload = input_object(raw)
     if set(payload) - {"version", "fields", "details", "title", "replacement", "tracking", "defer_history", "snapshot"}:
         raise HandoffError("input", "Unknown update options")

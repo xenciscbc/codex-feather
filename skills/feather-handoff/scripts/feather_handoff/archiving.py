@@ -72,6 +72,7 @@ def _pending(work: Snapshot, history_path: Path, code: str, message: str,
 
 
 def archive_work(store: Store, name: str, raw: object) -> dict:
+    store.require_write_root()
     expected = _input_version(raw)
     work = read_file(store.work_path(name))
     if expected != work.version:

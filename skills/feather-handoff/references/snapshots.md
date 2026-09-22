@@ -15,6 +15,16 @@ The JSON response contains `snapshot`, `complete`, `status` and `issues`. Copy t
 
 Capture is read-only and does not establish that a past test covered these bytes. Record test command, cwd, time and outcome separately. A claim that a test covered the baseline requires observations showing relevant sources unchanged across that test, and still excludes unobserved dependencies and external state.
 
+### Link existing test evidence
+
+Use the optional `驗證：` field to link a test run to a saved baseline without adding another schema:
+
+1. Select the files that support the claim, then capture and save the baseline immediately before the test.
+2. After the test, compare that saved baseline and confirm both the selected source observations and available Git identity stayed unchanged.
+3. Record the command, cwd, run time and outcome together with the baseline's `captured_at`, selected path scope, and post-test comparison result.
+
+The capture timestamp alone is no proof that the test used those bytes. Any selected-source drift or unknown observation, or changed/unknown Git evidence, leaves the link unconfirmed. Refreshing the baseline starts new evidence: test results linked to the old capture time and scope do not transfer to the refreshed baseline. This protocol records tests already being run; it does not require a rerun or authorize automated execution.
+
 The writer rechecks explicitly supplied present/missing observations and known Git identity before saving. On `snapshot-conflict`, reread the relevant sources and handoff, reconcile progress, then capture again if appropriate. It never silently refreshes the baseline. Unknown observations remain unknown and are not reread during save verification. Ordinary updates without `snapshot` preserve the old baseline even when sources changed. `snapshot: null` is rejected; no separate baseline-removal command exists.
 
 Baseline validation failures happen before saving. Tracking or archival failures after saving use the existing partial-result recovery, including the surviving path/version; do not repeat create over a saved handoff. Completion and sealing retain the full baseline, and retries preserve the completion identity.
