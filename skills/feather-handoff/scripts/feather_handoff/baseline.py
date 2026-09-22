@@ -141,5 +141,9 @@ def put(text: str, value: dict) -> str:
     block = block.replace("\n", newline)
     span = section(text)
     if span:
-        return text[:span[0]] + block + text[span[2]:]
-    return text.rstrip("\r\n") + newline * 2 + block
+        result = text[:span[0]] + block + text[span[2]:]
+    else:
+        result = text.rstrip("\r\n") + newline * 2 + block
+    if parse(result) != value:
+        raise HandoffError("snapshot-format", "Snapshot is hidden by Markdown fencing; close the code block before saving")
+    return result

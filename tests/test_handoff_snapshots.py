@@ -91,6 +91,28 @@ class HandoffSnapshotsTest(unittest.TestCase):
         self.run_tool("update", "--work", "w.md", payload={"version": updated["version"], "details": "new evidence"})
         self.assertEqual(baseline.parse(path.read_text(encoding="utf-8-sig")), value)
 
+    def test_unclosed_details_fence_rejects_snapshot_without_writes(self):
+        self.source()
+        value = self.capture()
+        fields = {"goal": "check", "progress": "observed", "next": "verify"}
+        for fence in ["```python", "~~~~text", "   ````"]:
+            with self.subTest(fence=fence):
+                before = self.tree()
+                result = self.run_tool("create", "--work", "w.md", expected=2,
+                                       payload={"fields": fields, "details": fence + "\nexample", "snapshot": value})
+                self.assertEqual(result["code"], "snapshot-format")
+                self.assertEqual(self.tree(), before)
+        saved = self.create(details="```python\nexample")
+        before = self.tree()
+        result = self.run_tool("update", "--work", "w.md", expected=2,
+                               payload={"version": saved["version"], "snapshot": value})
+        self.assertEqual(result["code"], "snapshot-format")
+        self.assertEqual(self.tree(), before)
+        repaired = self.run_tool("update", "--work", "w.md",
+                                 payload={"version": saved["version"], "details": "```python\nexample\n```", "snapshot": value})
+        self.assertEqual(baseline.parse(repaired["content"]), value)
+        self.assertTrue(self.run_tool("compare", "--work", "w.md")["complete"])
+
     def test_absent_invalid_and_archived_work_are_distinct(self):
         path = self.write_work("w.md")
         self.assertEqual(self.run_tool("compare", "--work", "w.md")["baseline_state"], "absent")
@@ -278,6 +300,20 @@ class ObservationUnitTest(unittest.TestCase):
             result = observations.capture(self.store, {"paths": ["a"]})
         self.assertFalse(result["complete"])
         self.assertEqual(result["snapshot"]["files"][0]["state"], "present")
+
+    def test_git_trust_failure_is_not_overridden_during_root_discovery_or_capture(self):
+        (self.project / "a").write_bytes(b"a")
+        denied = subprocess.CompletedProcess([], 128, "", "fatal: detected dubious ownership in repository")
+        with patch.object(subprocess, "run", return_value=denied) as git:
+            store = Store(str(self.project))
+            result = observations.capture(store, {"paths": ["a"]})
+        self.assertEqual(git.call_count, 3)
+        for call in git.call_args_list:
+            self.assertFalse(any("safe.directory" in arg for arg in call.args[0]))
+        self.assertEqual(result["snapshot"]["git"], {"state": "unknown", "reason": "git-error"})
+        self.assertEqual(result["status"], "partial")
+        self.assertFalse(result["complete"])
+        self.assertEqual(result["snapshot"]["files"][0]["sha256"], hashlib.sha256(b"a").hexdigest())
 
     def test_tracking_failure_reports_saved_baseline_and_version(self):
         from feather_handoff.writing import create_work

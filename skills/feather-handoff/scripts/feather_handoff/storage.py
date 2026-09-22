@@ -46,7 +46,7 @@ def project_root(value: str) -> Path:
         raise HandoffError("project", f"Project directory does not exist: {path}")
     try:
         result = subprocess.run(
-            ["git", "-c", f"safe.directory={path.as_posix()}", "-C", str(path),
+            ["git", "-C", str(path),
              "rev-parse", "--show-toplevel"], capture_output=True, text=True,
             encoding="utf-8", timeout=5, env=git_environment(),
         )

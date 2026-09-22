@@ -74,7 +74,7 @@ def git_observation(project: Path) -> dict:
     env = git_environment()
 
     def run(*args):
-        return subprocess.run(["git", "-c", f"safe.directory={project.as_posix()}", "-C", str(project), *args], capture_output=True,
+        return subprocess.run(["git", "-C", str(project), *args], capture_output=True,
                               text=True, encoding="utf-8", errors="replace", timeout=5, env=env)
 
     try:
