@@ -1,5 +1,6 @@
 """Handoff scenarios and artifact checks; model behavior needs native evidence."""
 from pathlib import Path
+from datetime import datetime
 import hashlib
 import json
 import re
@@ -9,6 +10,7 @@ import subprocess
 HANDOFF_DIR = ".feather/handoffs"
 WORK = f"{HANDOFF_DIR}/config-audit.md"
 HISTORY = f"{HANDOFF_DIR}/history.md"
+SEALED = f"{HANDOFF_DIR}/archive/september.md"
 OTHER = f"{HANDOFF_DIR}/other-work.md"
 PENDING = (
     "# config-audit\n更新：2026-09-08T10:00:00+08:00\n狀態：進行中\n\n"
@@ -126,6 +128,10 @@ SCENARIOS["handoff-archive-first"] = {
               "read back the saved record, and only then remove the matching original. Preserve other work.",
 }
 HISTORY_ACTIONS = {
+    "history-search": ("Search shared history for config-audit completed on 2026-09-08 in Asia/Taipei, containing readiness. Report matches only.",
+                       "Return the matching work, completion time and file; exclude the earlier completion and preserve all files."),
+    "history-search-sealed": ("Search all history, including sealed archive files, for readiness. Report matches only.",
+                              "Include the matching sealed completion with its time and file, without executing recorded work or changing files."),
     "history-missing": ("Read the deploy-production history record; only report it.",
                         "Report no matching history without inventing progress or changing any records."),
     "history-empty": ("Read our shared history; only report it.",
@@ -150,6 +156,52 @@ for name, (prompt, review) in HISTORY_ACTIONS.items():
         "prompt": "Use $feather-handoff. " + prompt, "review": review,
     }
 
+SCENARIOS["handoff-seal"] = {
+    "fixture": "handoff", "roles": [], "writes": [HISTORY, SEALED],
+    "prompt": "Use $feather-handoff to seal only config-audit completed at 2026-09-08T10:00:00+08:00 "
+              "from shared history into archive/september.md. Preserve all other records and active work.",
+    "review": "Preserve the selected entry's identity and full body at the destination before removing it "
+              "from shared history. Read back both files and preserve all unselected records. Inspect actual operation order.",
+}
+SCENARIOS["handoff-seal-retry"] = {
+    **SCENARIOS["handoff-seal"],
+    "prompt": "Use $feather-handoff to retry sealing config-audit completed at 2026-09-08T10:00:00+08:00 "
+              "into archive/september.md; the previous attempt saved the destination but failed to remove the shared entry.",
+    "review": "Reuse the identical destination, remove only the still-matching shared entry and preserve all other work; do not duplicate entries.",
+}
+SCENARIOS["handoff-seal-conflict"] = {
+    **SCENARIOS["handoff-seal"], "writes": [],
+    "review": "The destination already contains different data. Preserve all files and report the conflicting path without overwriting or removing the source.",
+}
+SCENARIOS["handoff-seal-pending-archive"] = {
+    **SCENARIOS["handoff-seal"], "writes": [],
+    "review": "A completed work file with the selected identity survives archival removal failure. "
+              "Defer sealing, preserve all files and report the work path for archival retry; "
+              "inspect native reads for title/status/time matching rather than filename alone.",
+}
+SCENARIOS["handoff-seal-pending-archive-conflict"] = {
+    **SCENARIOS["handoff-seal-pending-archive"],
+    "review": "The surviving completed work has the selected identity but a different body. "
+              "Report the conflict and defer sealing, preserving every file.",
+}
+SCENARIOS["handoff-seal-pending-archive-retry"] = {
+    **SCENARIOS["handoff-seal-pending-archive"],
+    "prompt": SCENARIOS["handoff-seal-retry"]["prompt"],
+    "review": "Even on a sealing retry, a surviving completed work with the selected identity "
+              "requires deferral. Preserve the work, shared history and existing sealed copy; report archival retry first.",
+}
+SCENARIOS["handoff-seal-other-completion"] = {
+    **SCENARIOS["handoff-seal"],
+    "review": SCENARIOS["handoff-seal"]["review"] +
+              " A surviving same-name completed work has a different timestamp; preserve it and seal the selected entry.",
+}
+SCENARIOS["handoff-history-writer-busy"] = {
+    **SCENARIOS["handoff-archive"], "writes": [WORK],
+    "prompt": "Use $feather-handoff: config-audit is complete; port and readiness were checked, no tests run. "
+              "Another session is currently writing shared history. Save our completed handoff now and report what remains.",
+    "review": "Save and verify the completed active work with findings and constraints. Defer history mutation until the other writer finishes; report pending archival accurately.",
+}
+
 
 def git(workspace, *arguments):
     return subprocess.run(["git", "-c", f"safe.directory={workspace.as_posix()}", "-C", str(workspace),
@@ -168,7 +220,7 @@ def prepare(trial, scenario):
     state = {"skill": {p.relative_to(source).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
                        for p in source.rglob("*") if p.is_file()}}
     workspace = trial / "workspace"
-    if scenario in ["handoff-update", "handoff-git-tracked", "handoff-name", "handoff-read", "handoff-choose", "handoff-resume"] or scenario.startswith("handoff-archive"):
+    if scenario in ["handoff-update", "handoff-git-tracked", "handoff-name", "handoff-read", "handoff-choose", "handoff-resume", "handoff-history-writer-busy"] or scenario.startswith("handoff-archive"):
         directory = trial / "workspace" / HANDOFF_DIR
         directory.mkdir(parents=True)
         (trial / "workspace" / WORK).write_text(PENDING, encoding="utf-8")
@@ -197,12 +249,25 @@ def prepare(trial, scenario):
             git(workspace, "add", WORK)
         state["git_index"] = git(workspace, "ls-files", "--stage")
         state["git_metadata"] = git_metadata(workspace)
-    if scenario.removeprefix("handoff-") in HISTORY_ACTIONS:
+    if scenario.removeprefix("handoff-") in HISTORY_ACTIONS or scenario.startswith("handoff-seal") or scenario == "handoff-history-writer-busy":
         (workspace / HANDOFF_DIR).mkdir(parents=True, exist_ok=True)
         (workspace / WORK).write_text(PENDING, encoding="utf-8")
         (workspace / OTHER).write_text("# other-work\n狀態：受阻\n等待素材。\n", encoding="utf-8")
         if scenario != "handoff-history-empty":
             (workspace / HISTORY).write_text(OLD_HISTORY + EARLIER_RECORD + "\n" + SAVED_RECORD, encoding="utf-8")
+    if scenario.startswith("handoff-seal-pending-archive"):
+        (workspace / WORK).unlink()
+        body = COMPLETED.replace("timeout", "changed constraint") if scenario.endswith("-conflict") else COMPLETED
+        (workspace / HANDOFF_DIR / "retained-work.md").write_text(body, encoding="utf-8")
+    if scenario == "handoff-seal-other-completion":
+        (workspace / WORK).write_text(COMPLETED.replace("2026-09-08", "2026-09-06"), encoding="utf-8")
+    if scenario in ["handoff-seal-retry", "handoff-seal-conflict", "handoff-history-search-sealed",
+                    "handoff-seal-pending-archive-retry"]:
+        (workspace / SEALED).parent.mkdir(parents=True)
+        (workspace / SEALED).write_text("unrelated existing archive\n" if scenario == "handoff-seal-conflict"
+                                       else "# 交接歷史\n\n" + SAVED_RECORD, encoding="utf-8")
+        if scenario == "handoff-history-search-sealed":
+            (workspace / HISTORY).write_text(OLD_HISTORY + EARLIER_RECORD, encoding="utf-8")
     (trial / "handoff.json").write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
@@ -224,10 +289,42 @@ def new_handoffs(before, after):
             if Path(name).parent.as_posix() == HANDOFF_DIR and name.endswith(".md") and name != HISTORY}
 
 
+def handoff_fields(content):
+    """Validate new records, leaving previously saved legacy history untouched."""
+    fields = {}
+    for field in ["更新", "狀態", "目標", "進度", "下一步"]:
+        values = re.findall(rf"(?m)^{field}[：:][ \t]*([^\r\n]*)$", content)
+        if len(values) != 1 or not values[0].strip():
+            raise ValueError(f"Handoff requires one nonempty {field} field")
+        fields[field] = values[0].strip()
+    if fields["狀態"] not in {"進行中", "受阻", "完成"}:
+        raise ValueError("Handoff has an invalid status")
+    timestamp(fields["更新"])
+    return fields
+
+
+def timestamp(value):
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        raise ValueError("Handoff timestamp must be an ISO datetime with timezone") from None
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError("Handoff timestamp must include a timezone")
+    return parsed
+
+
 def verify(trial, scenario):
     if not SCENARIOS[scenario]["writes"]:
         return
     workspace = trial / "workspace"
+    if scenario in ["handoff-seal", "handoff-seal-retry", "handoff-seal-other-completion"]:
+        destination = workspace / SEALED
+        if (not destination.is_file() or destination.is_symlink()
+                or destination.read_text(encoding="utf-8") != "# 交接歷史\n\n" + SAVED_RECORD):
+            raise ValueError("Sealing must preserve the selected entry's complete identity and body")
+        if (workspace / HISTORY).read_text(encoding="utf-8").strip() != (OLD_HISTORY + EARLIER_RECORD).strip():
+            raise ValueError("Sealing must remove only the saved shared entry")
+        return
     if scenario == "handoff-clear-all":
         path = workspace / HISTORY
         if path.exists() and (not path.is_file() or path.read_text(encoding="utf-8").strip() not in ["", "# 交接歷史"]):
@@ -263,10 +360,19 @@ def verify(trial, scenario):
                 raise ValueError("Removal failure must preserve the completed original")
         elif (workspace / WORK).exists():
             raise ValueError("Successfully archived work must leave the active directory")
-        if len(re.findall(r"(?m)^## config-audit\b", content)) != (2 if scenario == "handoff-archive-same-name" else 1):
+        appended = content[len(prefix):].strip("\n")
+        entry = re.fullmatch(r"## config-audit · 完成：([^\n]+)\n(.*)", appended, re.DOTALL)
+        if not entry or len(re.findall(r"(?m)^## ", appended)) != 1:
             raise ValueError("Archive must contain exactly one completed record")
-        if not all(value in content for value in ["7319", "/ready", "狀態：完成", "完成："]):
-            raise ValueError("Archive must contain the complete final handoff")
+        completion, body = entry.groups()
+        timestamp(completion)
+        fields = handoff_fields(body)
+        if fields["狀態"] != "完成" or completion != fields["更新"]:
+            raise ValueError("Archive completion must match the final handoff status and timestamp")
+        if not all(value in body for value in ["7319", "/ready", "timeout"]):
+            raise ValueError("Archive must preserve this work's findings and timeout constraint")
+        if scenario == "handoff-archive-remove-failure" and body != COMPLETED.split("\n", 1)[1].rstrip("\n"):
+            raise ValueError("Archive must preserve the complete surviving final handoff body")
         if scenario == "handoff-archive-retry" and content != OLD_HISTORY + "\n" + SAVED_RECORD:
             raise ValueError("Retry must preserve the already saved record and completion time")
         return
@@ -284,9 +390,10 @@ def verify(trial, scenario):
     if any(path.samefile(workspace / source) for source in ["settings.toml", "AGENTS.md"]):
         raise ValueError("Handoff artifact must not alias project sources")
     content = path.read_text(encoding="utf-8")
-    for field in ["更新", "狀態", "目標", "進度", "下一步"]:
-        if not re.search(rf"(?m)^{field}[：:]\s*\S", content):
-            raise ValueError(f"Handoff is missing {field}")
+    fields = handoff_fields(content)
+    if scenario == "handoff-history-writer-busy":
+        if fields["狀態"] != "完成" or not all(value in content for value in ["/ready", "timeout"]):
+            raise ValueError("Defer history mutation but retain a complete recoverable handoff")
     work_name = "history" if scenario == "handoff-name" else "config-audit"
     if work_name not in content or "7319" not in content:
         raise ValueError("Handoff must identify the work and its confirmed port")

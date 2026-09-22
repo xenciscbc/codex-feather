@@ -15,6 +15,8 @@ Output is UTF-8 JSON. Exit 0 means the operation was handled; distinguish `statu
 
 Reads do not write records or Git rules. Inspect the full selected work and relevant current project sources before resuming. The tool rejects linked/reparse paths and hard-linked records rather than following aliases. Different work files may have the same title; use the returned filename to distinguish them.
 
+`snapshot_state` is `absent`, `available` or `invalid`; list/read do not hash sources. When capturing a baseline or resuming a record that has one, follow [Source baselines and resume comparison](snapshots.md) for the read-only `snapshot` and `compare` commands and the optional create/update `snapshot` payload. Ordinary read/list requests do not invoke comparison.
+
 ## Create
 
 Use `create --work <work>.md` with one UTF-8 JSON object on stdin. Supply `title`, a `fields` object, and optional `details` text. Field keys are `goal`, `progress`, `next`, `notes`, `environment`, `verification`, `decision`, `updated`, `status`; required goal/progress/next must be nonempty. The tool supplies a zoned update time and `進行中` status when omitted. Status values are `進行中`, `受阻`, `完成`. Values are single-line text; long evidence belongs in `details`, rendered under `## 詳細紀錄`.

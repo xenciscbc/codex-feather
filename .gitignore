@@ -7,5 +7,8 @@ __pycache__/
 .scratch/feather-setup/build/
 .scratch/feather-setup/preexisting.patch
 .scratch/feather-setup/baselines/
+.scratch/feather-improvements/runs/
+.scratch/feather-improvements/bundle/
+.scratch/feather-improvements/dev-deps/
 dist/
 .scratch/feather-handoff-tool/live-smoke/

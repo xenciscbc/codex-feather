@@ -38,17 +38,28 @@ class Environment:
         raise ValueError(f"Unexpected installation namespace: {relative}")
 
     def require_agents_enabled(self) -> None:
-        enabled = True
+        setting = self.agents_setting(include_project=self.scope == "project")
+        if setting["enabled"] is False:
+            raise ValueError("Conflict: agents.enabled is explicitly false. Enable agents in your Codex settings before installing delegation; existing settings were preserved.")
+
+    def agents_setting(self, include_project: bool = True) -> dict:
+        enabled = None
+        source = None
         configs = [self.codex_home / "config.toml"]
-        if self.scope == "project":
+        if include_project:
             configs.extend(root / ".codex/config.toml" for root in reversed(self.project_roots()))
         for config in configs:
             content = read_regular(config)
             if content is not None:
                 parsed = tomllib.loads(content.decode("utf-8-sig"))
-                enabled = parsed.get("agents", {}).get("enabled", enabled)
-        if enabled is False:
-            raise ValueError("Conflict: agents.enabled is explicitly false. Enable agents in your Codex settings before installing delegation; existing settings were preserved.")
+                agents = parsed.get("agents", {})
+                if not isinstance(agents, dict):
+                    raise ValueError(f"Invalid agents table: {config}")
+                if "enabled" in agents:
+                    if not isinstance(agents["enabled"], bool):
+                        raise ValueError(f"agents.enabled must be a boolean: {config}")
+                    enabled, source = agents["enabled"], str(config)
+        return {"enabled": enabled, "source": source, "config_paths": [str(config) for config in configs]}
 
     def project_roots(self) -> list[Path]:
         markers = [".git"]

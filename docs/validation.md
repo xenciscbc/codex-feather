@@ -1,5 +1,27 @@
 # MVP 實作與驗證紀錄
 
+## 2026-09-08 analyst 成果與權限探針
+
+依使用者澄清，analyst 保護來源但可寫明確指定的分析成果；scout 純唯讀。已更新 domain 詞彙、產品指令、analyst sandbox 與情境資料，新增 analyst-report 驗收。
+
+- 16 項 unittest 通過（11.835 秒）；compileall 與 diff --check 通過。新增檢查涵蓋指定成果必須存在且非空、來源／其它路徑改動失敗，以及硬連結來源不能冒充獨立成果。成果語義與作者身分仍須以真實回合核對。
+- 第五輪新 session 的正式 scout 與未指定成果的 analyst 沒有寫檔；指定成果的 analyst 寫入分析報告且來源保持不變，主 Agent 沒有代寫。
+- 臨時診斷角色的 read-only 預設在本輪未形成強制隔離：原有權限下實際寫入探針成功，同目錄正向對照也成功。正式 scout 的唯讀行為通過，sandbox 強制唯讀不通過；兩者分開記錄。
+- 第五輪基準在 session 啟動前建立，143 個基準檔只變更兩個授權 canary。分析成果在指定路徑新增，其餘來源與前四輪結果保持不變。臨時角色於回合結束後移除並另記錄。
+
+詳細事件與環境限制見 [原生相容性](native-compatibility.md)。以下保留各輪歷史判定；第四輪的 analyst 唯讀 sandbox 期待已由本次來源保護規則取代。
+
+## 2026-09-08 規則修正回歸
+
+移除角色 TOML 的固定模型／強度，由主 Agent 依產品 AGENTS.md 的角色預設和使用者指定值解析兩欄，再透過原生參數派工。單層限制保留，補上直屬父 Agent 回報規則。
+
+- 14 項 unittest 全數通過，含四角色各自禁止重新加入 model 或 model_reasoning_effort、三個覆寫情境及唯讀素材保全、舊格式拒絕驗收。compileall 與 diff --check 通過。
+- `test_gpt` 第四輪新 session 實跑四項：baseline、model-only、effort-only、both。原生具名角色呼叫均接受、結果正確、own turn_context 的模型與強度吻合；三個覆寫案例已解除第三輪的 blocked 狀態。
+- 原生父子 metadata 與四個完成回合的工具事件未見孫代理、再次委派或跨 task 回報。100 個舊檔只有五份允許的啟動前模板更新，其餘 95 檔保持不變；模板與產品來源一致。
+- 限制：服務端逐回應模型 telemetry 未取得。四個子 context 的 workspace-write 與模板 read-only 不符，雖未發生子代理寫入，仍不能宣稱強制唯讀通過。第四輪新增素材的 session 快照晚於派發，保全結論另以舊 manifest 與工具事件補核。
+
+詳見 [原生相容性](native-compatibility.md)。以下保留初始 MVP 的歷史驗證紀錄。
+
 2026-09-07。對照 `.scratch/feather-mvp/spec.md` 及待辦 01–06。
 
 ## 已實作

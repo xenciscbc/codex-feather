@@ -14,6 +14,12 @@ class HandoffTrialTest(unittest.TestCase):
         return subprocess.run([sys.executable, str(ROOT / "scripts/trial.py"), *map(str, arguments)],
                               capture_output=True, text=True, encoding="utf-8")
 
+    def final_body(self, original):
+        return (original.split("\n", 1)[1].replace("T10:00:00", "T12:00:00")
+                .replace("狀態：進行中", "狀態：完成")
+                .replace("尚未核對 readiness", "已核對 readiness = /ready；未執行測試")
+                .replace("下一步：核對 readiness", "下一步：無"))
+
     def test_create_requires_a_real_handoff_and_preserves_project_instructions(self):
         with tempfile.TemporaryDirectory() as temporary:
             trial = Path(temporary) / "trial"
@@ -156,11 +162,45 @@ class HandoffTrialTest(unittest.TestCase):
             history = directory / "history.md"
             history.write_text(history.read_text(encoding="utf-8") +
                                "\n## config-audit · 完成：2026-09-08T12:00:00+08:00\n" +
-                               original.split("\n", 1)[1].replace("狀態：進行中", "狀態：完成") +
-                               "\n進度補充：已核對 /ready；測試未執行。\n", encoding="utf-8")
+                               self.final_body(original), encoding="utf-8")
             self.assertEqual(self.run_trial("verify", trial).returncode, 0)
             history.write_text(history.read_text(encoding="utf-8").replace("previous", "lost"), encoding="utf-8")
             self.assertNotEqual(self.run_trial("verify", trial).returncode, 0)
+
+
+    def test_archive_rejects_missing_fields_invalid_times_and_lost_constraints(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            trial = Path(temporary) / "trial"
+            self.assertEqual(self.run_trial("prepare", trial, "--scenario", "handoff-archive").returncode, 0)
+            directory = trial / "workspace/.feather/handoffs"
+            history = directory / "history.md"
+            prefix = history.read_text(encoding="utf-8")
+            work = directory / "config-audit.md"
+            body = self.final_body(work.read_text(encoding="utf-8"))
+            entry = "\n## config-audit · 完成：2026-09-08T12:00:00+08:00\n" + body
+            work.unlink()
+            invalid = {
+                "keyword-only": "\n## config-audit · 完成：not-a-time\n狀態：完成\n7319 /ready\n",
+                "bad-date": entry.replace("2026-09-08", "2026-02-30"),
+                "no-timezone": entry.replace("+08:00", ""),
+                "different-time": entry.replace("更新：2026-09-08T12", "更新：2026-09-08T10"),
+                "unfinished": entry.replace("狀態：完成", "狀態：進行中"),
+                "duplicate-status": entry + "狀態：完成\n",
+                "lost-constraint": entry.replace("timeout", "removed"),
+                "lost-finding": entry.replace("/ready", "removed"),
+                "empty-goal": entry.replace("目標：核對服務設定", "目標："),
+            }
+            for field in ["更新", "狀態", "目標", "進度", "下一步"]:
+                invalid[f"missing-{field}"] = "\n".join(line for line in entry.split("\n")
+                                                        if not line.startswith(field + "："))
+            for name, content in invalid.items():
+                with self.subTest(name=name):
+                    history.write_text(prefix + content, encoding="utf-8")
+                    self.assertNotEqual(self.run_trial("verify", trial).returncode, 0)
+            history.write_text(prefix + entry, encoding="utf-8")
+            result = self.run_trial("verify", trial)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(result.stdout)["actual"], "unconfirmed")
 
 
     def test_archive_failure_preserves_recoverable_work(self):
@@ -198,6 +238,10 @@ class HandoffTrialTest(unittest.TestCase):
                                "\n## config-audit · 完成：2026-09-08T10:00:00+08:00\n" + original.split("\n", 1)[1],
                                encoding="utf-8")
             self.assertEqual(self.run_trial("verify", trial).returncode, 0)
+            saved = history.read_text(encoding="utf-8")
+            history.write_text(saved + "驗證：invented extra result\n", encoding="utf-8")
+            self.assertNotEqual(self.run_trial("verify", trial).returncode, 0)
+            history.write_text(saved, encoding="utf-8")
             (directory / "config-audit.md").unlink()
             self.assertNotEqual(self.run_trial("verify", trial).returncode, 0)
 
@@ -212,8 +256,7 @@ class HandoffTrialTest(unittest.TestCase):
             history = directory / "history.md"
             history.write_text(history.read_text(encoding="utf-8") +
                                "\n## config-audit · 完成：2026-09-08T12:00:00+08:00\n" +
-                               original.split("\n", 1)[1].replace("狀態：進行中", "狀態：完成") +
-                               "\n進度補充：已核對 /ready；測試未執行。\n", encoding="utf-8")
+                               self.final_body(original), encoding="utf-8")
             (directory / "config-audit.md").unlink()
             self.assertEqual(self.run_trial("verify", trial).returncode, 0)
             history.write_text(history.read_text(encoding="utf-8").replace("2026-09-07T09:00:00+08:00", "lost"), encoding="utf-8")
@@ -221,7 +264,8 @@ class HandoffTrialTest(unittest.TestCase):
 
 
     def test_history_queries_and_ambiguous_clear_have_no_side_effects(self):
-        for scenario in ["handoff-history", "handoff-clear-ambiguous", "handoff-keep-history", "handoff-history-missing", "handoff-history-empty"]:
+        for scenario in ["handoff-history", "handoff-clear-ambiguous", "handoff-keep-history", "handoff-history-missing", "handoff-history-empty",
+                         "handoff-history-search", "handoff-history-search-sealed", "handoff-seal-conflict"]:
             with self.subTest(scenario=scenario), tempfile.TemporaryDirectory() as temporary:
                 trial = Path(temporary) / "trial"
                 result = self.run_trial("prepare", trial, "--scenario", scenario)
@@ -233,6 +277,79 @@ class HandoffTrialTest(unittest.TestCase):
                 else:
                     history.write_text("unrequested history", encoding="utf-8")
                 self.assertNotEqual(self.run_trial("verify", trial).returncode, 0)
+
+
+    def test_sealing_preserves_complete_entry_and_supports_retry(self):
+        for scenario in ["handoff-seal", "handoff-seal-retry", "handoff-seal-other-completion"]:
+            with self.subTest(scenario=scenario), tempfile.TemporaryDirectory() as temporary:
+                trial = Path(temporary) / "trial"
+                result = self.run_trial("prepare", trial, "--scenario", scenario)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                directory = trial / "workspace/.feather/handoffs"
+                source = directory / "history.md"
+                original = source.read_text(encoding="utf-8")
+                start = original.index("## config-audit · 完成：2026-09-08")
+                entry = original[start:]
+                destination = directory / "archive/september.md"
+                destination.parent.mkdir(exist_ok=True)
+                source.write_text(original[:start], encoding="utf-8")
+                if scenario != "handoff-seal-retry":
+                    self.assertNotEqual(self.run_trial("verify", trial).returncode, 0)
+                destination.write_text("# 交接歷史\n\n" + entry, encoding="utf-8")
+                result = self.run_trial("verify", trial)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                destination.write_text("# 交接歷史\n\n" + entry.replace("timeout", "lost"), encoding="utf-8")
+                self.assertNotEqual(self.run_trial("verify", trial).returncode, 0)
+                destination.write_text("# 交接歷史\n\n" + entry, encoding="utf-8")
+                source.write_text("# 交接歷史\n", encoding="utf-8")
+                self.assertNotEqual(self.run_trial("verify", trial).returncode, 0)
+
+    def test_sealing_defers_when_completed_work_survives_archival(self):
+        for scenario in ["handoff-seal-pending-archive", "handoff-seal-pending-archive-conflict",
+                         "handoff-seal-pending-archive-retry"]:
+            with self.subTest(scenario=scenario), tempfile.TemporaryDirectory() as temporary:
+                trial = Path(temporary) / "trial"
+                prepared = self.run_trial("prepare", trial, "--scenario", scenario)
+                self.assertEqual(prepared.returncode, 0, prepared.stderr)
+                directory = trial / "workspace/.feather/handoffs"
+                work = directory / "retained-work.md"
+                self.assertIn("狀態：完成", work.read_text(encoding="utf-8"))
+                self.assertFalse((directory / "config-audit.md").exists())
+                checked = self.run_trial("verify", trial)
+                self.assertEqual(checked.returncode, 0, checked.stderr)
+                self.assertEqual(json.loads(checked.stdout)["actual"], "unconfirmed")
+
+                history = directory / "history.md"
+                original = history.read_text(encoding="utf-8")
+                start = original.index("## config-audit · 完成：2026-09-08")
+                destination = directory / "archive/september.md"
+                destination.parent.mkdir(exist_ok=True)
+                saved = destination.read_bytes() if destination.exists() else None
+                destination.write_text("# 交接歷史\n\n" + original[start:], encoding="utf-8")
+                history.write_text(original[:start], encoding="utf-8")
+                # The previously accepted seal would hide the identity from archival retry.
+                self.assertNotEqual(self.run_trial("verify", trial).returncode, 0)
+                history.write_text(original, encoding="utf-8")
+                if saved is None:
+                    destination.unlink()
+                else:
+                    destination.write_bytes(saved)
+                self.assertEqual(self.run_trial("verify", trial).returncode, 0)
+                work.unlink()
+                self.assertNotEqual(self.run_trial("verify", trial).returncode, 0)
+
+    def test_busy_history_writer_keeps_completed_work_without_touching_history(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            trial = Path(temporary) / "trial"
+            self.assertEqual(self.run_trial("prepare", trial, "--scenario", "handoff-history-writer-busy").returncode, 0)
+            directory = trial / "workspace/.feather/handoffs"
+            work = directory / "config-audit.md"
+            work.write_text("# config-audit\n" + self.final_body(work.read_text(encoding="utf-8")), encoding="utf-8")
+            checked = self.run_trial("verify", trial)
+            self.assertEqual(checked.returncode, 0, checked.stderr)
+            history = directory / "history.md"
+            history.write_text(history.read_text(encoding="utf-8") + "unexpected change\n", encoding="utf-8")
+            self.assertNotEqual(self.run_trial("verify", trial).returncode, 0)
 
 
     def test_partial_history_clear_preserves_other_completions_and_active_work(self):
@@ -305,8 +422,7 @@ class HandoffTrialTest(unittest.TestCase):
             (directory / "config-audit.md").unlink()
             self.assertNotEqual(self.run_trial("verify", trial).returncode, 0)
             history.write_text("# 交接歷史\n\n## config-audit · 完成：2026-09-08T12:00:00+08:00\n" +
-                               original.split("\n", 1)[1].replace("狀態：進行中", "狀態：完成") +
-                               "\n進度補充：已核對 /ready；未測試。\n", encoding="utf-8")
+                               self.final_body(original), encoding="utf-8")
             self.assertEqual(self.run_trial("verify", trial).returncode, 0)
 
 

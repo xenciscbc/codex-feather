@@ -3,6 +3,7 @@ import re
 from datetime import datetime
 
 from .storage import Snapshot, Store, read_file
+from .baseline import parse as parse_baseline
 
 
 FIELDS = {"updated": "更新", "status": "狀態", "goal": "目標", "progress": "進度",
@@ -39,9 +40,14 @@ def summary(snapshot: Snapshot) -> dict:
         problems.append("Invalid status")
     if not valid_time(fields["updated"]):
         problems.append("Invalid ISO timestamp with timezone")
+    try:
+        baseline_state = "available" if parse_baseline(text) is not None else "absent"
+    except ValueError as error:
+        baseline_state = "invalid"
+        problems.append(str(error))
     return {"work": snapshot.path.name, "title": title.group(1).strip() if title else snapshot.path.stem,
             **fields, "progress": fields["progress"][:240], "progress_truncated": len(fields["progress"]) > 240,
-            "version": snapshot.version, "problems": problems,
+            "version": snapshot.version, "problems": problems, "snapshot_state": baseline_state,
             "record_status": "格式待確認" if problems else
             ("完成待歸檔" if fields["status"] == "完成" else fields["status"])}
 

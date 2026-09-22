@@ -6,6 +6,8 @@ import subprocess
 from .records import FIELDS, REQUIRED, STATUSES, read_work, summary, valid_time
 from .storage import HandoffError, Snapshot, Store, create_file, read_file, replace_file
 from .tracking import ensure_tracking
+from . import baseline
+from .observations import verify_for_save
 
 
 def input_object(payload: object) -> dict:
@@ -42,7 +44,7 @@ def validated_fields(payload: dict, create: bool) -> dict[str, str]:
 
 def create_work(store: Store, name: str, raw: object) -> dict:
     payload = input_object(raw)
-    if set(payload) - {"title", "fields", "details", "tracking", "defer_history"}:
+    if set(payload) - {"title", "fields", "details", "tracking", "defer_history", "snapshot"}:
         raise HandoffError("input", "Unknown create options")
     path = store.work_path(name)
     title = text_value(payload.get("title", path.stem), "title").strip()
@@ -55,13 +57,21 @@ def create_work(store: Store, name: str, raw: object) -> dict:
     content = f"# {title}\n" + "\n".join(f"{label}：{fields[key]}" for key, label in FIELDS.items() if key in fields) + "\n"
     if "details" in payload:
         content += "\n## 詳細紀錄\n" + text_value(payload["details"], "details", multiline=True).rstrip("\n") + "\n"
+    if "snapshot" in payload:
+        # A second managed section in details must not be silently replaced.
+        if baseline.section(content) is not None:
+            raise HandoffError("snapshot-format", "Snapshot supplied both in details and payload")
+        content = baseline.put(content, baseline.validate(payload["snapshot"]))
+    new_baseline = baseline.parse(content)
+    if new_baseline is not None:
+        verify_for_save(store, new_baseline)
     create_file(path, content.encode("utf-8"))
     return finish_save(store, name, tracking, payload)
 
 
 def update_work(store: Store, name: str, raw: object) -> dict:
     payload = input_object(raw)
-    if set(payload) - {"version", "fields", "details", "title", "replacement", "tracking", "defer_history"}:
+    if set(payload) - {"version", "fields", "details", "title", "replacement", "tracking", "defer_history", "snapshot"}:
         raise HandoffError("input", "Unknown update options")
     original = read_file(store.work_path(name))
     if payload.get("version") != original.version:
@@ -75,6 +85,7 @@ def update_work(store: Store, name: str, raw: object) -> dict:
             raise HandoffError("input", "replacement cannot be combined with partial edits")
         content = text_value(payload["replacement"], "replacement", multiline=True)
     else:
+        baseline.parse(content)  # Preserve ambiguous managed content for explicit repair.
         fields = validated_fields(payload, create=False)
         title = re.search(r"(?m)^# ([^\r\n]+)", content)
         if not title:
@@ -105,19 +116,30 @@ def update_work(store: Store, name: str, raw: object) -> dict:
         content = header + tail
         if "details" in payload:
             details = text_value(payload["details"], "details", multiline=True)
-            headings = list(re.finditer(r"(?m)^## 詳細紀錄[ \t]*(?:\r?\n|$)", content))
-            if len(headings) > 1:
-                raise HandoffError("format", "Duplicate 詳細紀錄 sections require an explicit reviewed replacement")
-            if headings:
-                heading = headings[0]
-                following = re.search(r"(?m)^#{1,2}[ \t]+", content[heading.end():])
-                boundary = heading.end() + following.start() if following else len(content)
-                prefix = content[:heading.end()]
+            if "snapshot" in payload and baseline.section(details) is not None:
+                raise HandoffError("snapshot-format", "Snapshot supplied both in details and payload")
+            try:
+                details_span = baseline.section(content, "## 詳細紀錄")
+            except ValueError as error:
+                raise HandoffError("format", str(error)) from None
+            if details_span:
+                prefix = content[:details_span[1]]
                 if not prefix.endswith("\n"):
                     prefix += newline
-                content = prefix + details.rstrip("\r\n") + newline + content[boundary:]
+                content = prefix + details.rstrip("\r\n") + newline + content[details_span[2]:]
             else:
                 content = content.rstrip("\r\n") + newline * 2 + "## 詳細紀錄" + newline + details.rstrip("\r\n") + newline
+        if "snapshot" in payload:
+            content = baseline.put(content, baseline.validate(payload["snapshot"]))
+    new_baseline = baseline.parse(content)
+    try:
+        old_baseline = baseline.parse(original.text)
+    except ValueError:
+        old_baseline = None  # An explicit replacement may repair an invalid section.
+    if old_baseline is not None and new_baseline is None:
+        raise HandoffError("snapshot-format", "Removing an existing baseline is not supported")
+    if new_baseline is not None and ("snapshot" in payload or new_baseline != old_baseline):
+        verify_for_save(store, new_baseline)
     data = content.encode("utf-8")
     if original.data.startswith(b"\xef\xbb\xbf"):
         data = b"\xef\xbb\xbf" + data

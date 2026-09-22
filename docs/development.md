@@ -16,7 +16,7 @@ python scripts/trial.py check .scratch/feather-mvp/runs/my-scout
 
 每個情境都使用新的目錄；既有目錄拒絕覆寫。入口建立獨立 `home`、四份角色、最小 config、workspace、基準雜湊與 `review.json`，不複製真實設定、憑證或 hook。目前 manifest 為 format=3；舊格式試用目錄請重新準備，原始證據保留。
 
-## 同一入口的十三種情境
+## 同一入口的分工情境
 
 `--scenario` 僅在 prepare 選擇，後續指令依 manifest 使用原情境。
 
@@ -35,6 +35,8 @@ python scripts/trial.py check .scratch/feather-mvp/runs/my-scout
 | direct-global | 主 Agent 綜合時間與預算限制選 A |
 | generic | 通用子 Agent 創作三個雙字名稱，主 Agent 提供選擇理由 |
 | coordination | 獨立查找／分析、依賴與共享檔案依序寫入、缺規格阻塞、重新分工、矛盾整合 |
+| return-contract | 四角色與通用子任務回傳五項資訊；主 Agent 驗收成果並拒收缺必要理由的 completed 聲明 |
+| bounded-reclaim | 部分成果後同原因兩次失敗；停止後收回，保留部分成果，不執行第三次嘗試 |
 
 每個試用的 `review.json` 含具體人工验收準則。素材及規格位於 `tests/fixtures/`；已知答案和工程行為檢查位於 workspace 外的 `scripts/scenarios.py`。
 
@@ -70,6 +72,12 @@ python scripts/trial.py verify .scratch/feather-mvp/runs/my-scout
 `check` 檢查四角色配置及原始素材未變；`verify` 容許情境指定的寫入，檢查範圍外的新增／刪除／修改，並驗證批次結果、工程函式行為、協調檔案內容。executor 的 verify 會在子 Python 程序中執行生成的 retry.py；這是程式測試，不是模型呼叫。Python 編譯檢查是語法檢查，並非型別檢查；安裝器另外執行 mypy，既有試用工具的驗收方式維持不變。
 
 所有唯讀／創作／分析答案及派工行為仍由 `review.json` 準則檢閱原生事件與最終回覆。`artifacts: pass` 只表示檔案成果通過，不能證明選角正確、從未寫入後還原、工作是否並行或模型綁定。
+
+新分工情境會核對具體成果：return-contract 檢查兩份 READY 與 retry_delay 行為；bounded-reclaim 檢查 PARTIAL 仍在且 attempts 恰為 2。錯值、缺檔或第三次嘗試使離線成果驗收失敗，但是否正確回傳、拒收及移交所有權仍須檢閱原生事件。
+
+來源基準的格式與 CLI 回歸為 `test_handoff_baseline.py`、`test_handoff_snapshots.py`；`test_snapshot_deployment.py` 的 payload 完整性檢查不需要 Codex，實際部署／更新／移除測試需要原生 Codex，可用 `FEATHER_TEST_CODEX` 指定。Linux/WSL 須指向 Linux 原生執行檔，不能沿用 Windows 的 pnpm shim。
+
+接續情境包括 `handoff-snapshot-read`、`handoff-snapshot-resume` 與 `handoff-snapshot-partial`，可由相同 prepare/verify 流程執行；格式、成果與原生行為的驗證範圍見 [接續可靠性驗證](resume-reliability-validation.md)。
 
 人工核對必須包含：
 

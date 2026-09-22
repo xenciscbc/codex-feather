@@ -5,6 +5,11 @@ import sys
 
 from .records import list_work, read_work
 from .storage import HandoffError, Store
+from .baseline import unique_object
+
+
+def input_payload():
+    return json.loads(sys.stdin.buffer.read().decode("utf-8-sig"), object_pairs_hook=unique_object)
 
 
 def main() -> int:
@@ -14,6 +19,9 @@ def main() -> int:
     parser.add_argument("--project", required=True, help="Existing project directory")
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("list")
+    commands.add_parser("snapshot", help="Read source observations: JSON {paths: [...]} on stdin")
+    compare_command = commands.add_parser("compare", help="Compare a work baseline without modifying files")
+    compare_command.add_argument("--work", required=True)
     read = commands.add_parser("read")
     read.add_argument("--work", required=True)
     create = commands.add_parser("create", help="JSON {title, fields, details?} on stdin")
@@ -34,20 +42,26 @@ def main() -> int:
     args = parser.parse_args()
     try:
         store = Store(args.project)
-        if args.command in {"create", "update"}:
+        if args.command == "snapshot":
+            from .observations import capture
+            result = capture(store, input_payload())
+        elif args.command == "compare":
+            from .observations import compare
+            result = compare(store, args.work)
+        elif args.command in {"create", "update"}:
             from .writing import create_work, update_work
-            payload = json.loads(sys.stdin.buffer.read().decode("utf-8-sig"))
+            payload = input_payload()
             action = create_work if args.command == "create" else update_work
             result = action(store, args.work, payload)
         elif args.command == "archive":
             from .archiving import archive_work
-            result = archive_work(store, args.work, json.loads(sys.stdin.buffer.read().decode("utf-8-sig")))
+            result = archive_work(store, args.work, input_payload())
         elif args.command == "clear":
             from .history_mutations import clear_history
-            result = clear_history(store, json.loads(sys.stdin.buffer.read().decode("utf-8-sig")))
+            result = clear_history(store, input_payload())
         elif args.command == "seal":
             from .history_mutations import seal_history
-            result = seal_history(store, json.loads(sys.stdin.buffer.read().decode("utf-8-sig")))
+            result = seal_history(store, input_payload())
         elif args.command == "history":
             from .history import query_history
             result = query_history(store, work=args.work, date_from=args.from_date,
@@ -59,4 +73,4 @@ def main() -> int:
         result = {"status": "error", "complete": False,
                   "code": getattr(error, "code", "io"), "message": str(error)}
     print(json.dumps(result, ensure_ascii=False))
-    return 2 if result["status"] in {"error", "partial"} else 0
+    return 2 if result["status"] in {"error", "partial"} or (args.command == "compare" and result["status"] == "missing") else 0

@@ -1,5 +1,31 @@
 # 原生相容性查證
 
+## 2026-09-08：scout 唯讀與 analyst 來源保護
+
+使用者澄清 analyst 並非全面禁止寫檔：來源文件不可變，明確指定時可另外產出分析成果。現行 analyst.toml 因此使用 workspace-write；具體限制是只写分配的成果路徑、來源及其它檔案不變。沒有指定成果時仍只回傳分析。scout 維持純唯讀行為與 read-only sandbox 預設。第四輪對 analyst 的 read-only 期待屬於這次澄清前的歷史測試。
+
+第五輪於新 session `01a07e81-2e73-70c0-83ff-6b8a117e640f` 實測：正式 scout 查找未寫檔；沒有成果路徑的 analyst 直接回傳分析；有指定路徑的 analyst 親自寫入 round5/outputs/analysis.md，來源雜湊不變。
+
+為區分工作規則與 sandbox，測試另建臨時 scout-permission-probe 角色：sandbox 同為 read-only，唯獨指令明確授權一次寫入拋棄式 canary。主 Agent 的同目錄正向對照成功，診斷子代理也以原有權限成功寫入 canary；原生 context 顯示 workspace-write。這證明本輪環境沒有強制採用該角色的唯讀預設，不能把正式 scout 自願不寫檔當成強制隔離通過。診斷角色不是產品 scout，測試例外不加入產品模板，完成後移除臨時角色並保留模板副本與清理紀錄。
+
+此現象與 [官方 Subagents 權限說明](https://learn.chatgpt.com/docs/agent-configuration/subagents#approvals-and-sandbox-controls) 所述「父回合即時權限會重新套用到子代理並可覆蓋角色預設」一致。Feather 不修改主 session 權限以追求表面一致；強制唯讀有需求時，必須使用另行驗證的執行環境。analyst 的 workspace-write 也不提供逐檔來源隔離。
+
+第五輪有啟動前完整基準，核對 143 個檔案只改變兩個授權探針，其餘來源、舊成果與設定保持不變。詳見 [第五輪報告](D:/work_data/project/other/test_gpt/REPORT_ROUND5.md) 與 [證據明細](D:/work_data/project/other/test_gpt/ROUND5_EVIDENCE.md)；基準核對描述的是完成回合，後續臨時角色移除另有清理紀錄。
+
+## 2026-09-08：派工時選擇模型與強度
+
+第三輪新 session 實测中，含 model / model_reasoning_effort 的 scout、analyst 角色被工具標示為不可變更，三個使用者覆寫案例在派工前 blocked。[官方 Subagents 文件](https://learn.chatgpt.com/docs/agent-configuration/subagents) 確認角色檔設定優先於 spawn 值；省略角色欄位時，原生先取顯式 spawn 值，再取 agents 預設及父設定。
+
+新版四角色 TOML 移除這兩欄，保留職責、sandbox 與單層委派限制。Feather 預設移到產品 AGENTS.md；主 Agent 逐欄解析使用者指定值後，對具名角色明確傳入兩欄，避免只指定模型時採用該模型的原生預設強度。使用與覆寫相容的上下文模式；工具若要求有限繼承，brief 必須補足必要資訊。
+
+靜態驗收改用 manifest format=3，拒絕殘留模型鎖定；新增 scout-model、scout-effort、analyst-override 三個真實派工情境。更新模板後須開新 session。
+
+第四輪已於另一 project 的新 session `01a07e6c-4124-7972-be15-872e2fc64255` 完成：四次具名角色派工都明示兩欄及 fork_turns=none，原生接受且各自完成真實工作。baseline 為 scout luna/low；只改模型為 scout sol/low；只改強度為 scout luna/high；雙欄覆寫為 analyst luna/low。own turn_context 與各次請求一致，可讀原生代理樹只有四個 depth=1 子代理，沒有孫代理或跨 task 回報。底層逐回應模型 telemetry 仍未提供；不能以設定 metadata 代替。
+
+本輪另確認權限差異：scout、analyst 模板保留 read-only，但四個原生 context 的 sandbox_policy.type 都是 workspace-write。實際子代理沒有改檔；強制唯讀 sandbox 尚未成立，原因未診斷，不宣稱整體權限驗收通過。來源與詳細事件在測試 project 的 [第四輪報告](D:/work_data/project/other/test_gpt/REPORT_ROUND4.md) 與 [證據明細](D:/work_data/project/other/test_gpt/ROUND4_EVIDENCE.md)。
+
+下列為 2026-09-07 舊版固定模型模板的歷史紀錄，不代表目前模板內容。
+
 查證日期：2026-09-07。本機 `codex --version`：`codex-cli 0.153.4`。
 這是目前試用版本記錄，並非最低支援版本或四角色驗收通過聲明。
 

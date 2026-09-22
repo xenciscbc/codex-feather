@@ -9,12 +9,13 @@ import subprocess
 import sys
 import time
 import tomllib
-from scenarios import ROLES, SCENARIOS, EXECUTOR_CHECK
+from scenarios import ROLES, SCENARIOS, EXECUTOR_CHECK, RETURN_CONTRACT_CHECK
 import handoff_trials
 import claude_memory_trials
 import claude_memory_link_trials
+import snapshot_trials
 
-HANDOFF_FAMILIES = (handoff_trials, claude_memory_trials, claude_memory_link_trials)
+HANDOFF_FAMILIES = (handoff_trials, claude_memory_trials, claude_memory_link_trials, snapshot_trials)
 HANDOFF_SCENARIOS = {name: family for family in HANDOFF_FAMILIES for name in family.SCENARIOS}
 SCENARIOS = {**SCENARIOS, **{name: family.SCENARIOS[name] for name, family in HANDOFF_SCENARIOS.items()}}
 
@@ -51,7 +52,7 @@ def prepare(trial, scenario="scout"):
     (trial / "home/config.toml").write_text('project_root_markers = [".feather-root"]\n\n[agents]\nenabled = true\n', encoding="utf-8")
     (trial / "prompt.txt").write_text(SCENARIOS[scenario]["prompt"], encoding="utf-8")
     write_json(trial / "manifest.json", {
-        "format": 2, "scenario": scenario, "expected": EXPECTED if scenario == "scout" else SCENARIOS[scenario]["roles"], "actual": "unconfirmed",
+        "format": 3, "scenario": scenario, "expected": SCENARIOS[scenario].get("expected", EXPECTED if scenario == "scout" else SCENARIOS[scenario]["roles"]), "actual": "unconfirmed",
         "workspace_before": hashes(trial / "workspace", exclude_git=scenario.startswith("handoff-git-")),
     })
     write_json(trial / "review.json", {
@@ -63,7 +64,7 @@ def prepare(trial, scenario="scout"):
 
 def check(trial, pristine=True):
     manifest = json.loads((trial / "manifest.json").read_text(encoding="utf-8"))
-    if manifest.get("format") != 2 or manifest.get("scenario") not in SCENARIOS:
+    if manifest.get("format") != 3 or manifest.get("scenario") not in SCENARIOS:
         raise ValueError("Unsupported trial manifest; prepare a fresh trial")
     family = HANDOFF_SCENARIOS.get(manifest["scenario"])
     if family:
@@ -74,11 +75,14 @@ def check(trial, pristine=True):
     configured = {}
     for name, (model, effort, sandbox) in ROLES.items():
         role = tomllib.loads((trial / "home/agents" / f"{name}.toml").read_text(encoding="utf-8"))
-        if (role.get("name"), role.get("model"), role.get("model_reasoning_effort"), role.get("sandbox_mode")) != (name, model, effort, sandbox):
-            raise ValueError(f"{name} binding or sandbox does not match the spec")
+        if "model" in role or "model_reasoning_effort" in role:
+            raise ValueError(f"{name} locks model or reasoning; remove role bindings and prepare a fresh trial")
+        if (role.get("name"), role.get("sandbox_mode")) != (name, sandbox):
+            raise ValueError(f"{name} identity or sandbox does not match the spec")
         if not role.get("description") or not role.get("developer_instructions"):
             raise ValueError(f"Missing required native role fields: {name}")
-        configured[name] = {"model": model, "reasoning": effort, "sandbox": sandbox}
+        configured[name] = {"model": None, "reasoning": None, "sandbox": sandbox,
+                            "dispatch_defaults": {"model": model, "reasoning": effort}}
     if {p.name for p in (trial / "home/agents").glob("*.toml")} != {f"{r}.toml" for r in ROLES}:
         raise ValueError("Unexpected role template in isolated home")
     config = tomllib.loads((trial / "home/config.toml").read_text(encoding="utf-8"))
@@ -110,7 +114,13 @@ def verify(trial):
     if family:
         family.verify(trial, scenario)
     workspace = trial / "workspace"
-    if scenario == "mech":
+    if scenario == "analyst-report":
+        report = workspace / "analysis.md"
+        if not report.is_file() or not report.read_text(encoding="utf-8").strip():
+            raise ValueError("Analyst must produce the assigned nonempty analysis.md artifact")
+        if report.is_symlink() or any(report.samefile(workspace / p) for p in before):
+            raise ValueError("Analyst artifact must be separate from source files, not a link or alias")
+    elif scenario == "mech":
         for region, retries in [("east", 2), ("west", 3)]:
             expected = f"[api]\ntimeout_ms = 2500\nretries = {retries}\n"
             if (workspace / f"configs/{region}.toml").read_text(encoding="utf-8") != expected:
@@ -123,6 +133,25 @@ def verify(trial):
     elif scenario == "coordination":
         if (workspace / "output/summary.txt").read_text(encoding="utf-8") != "7319\nVERIFIED\n":
             raise ValueError("Coordination result must be 7319 followed by VERIFIED")
+    elif scenario == "return-contract":
+        for region in ("east", "west"):
+            result_file = workspace / f"output/{region}.txt"
+            if not result_file.is_file() or result_file.read_text(encoding="utf-8") != "READY\n":
+                raise ValueError(f"Return-contract batch result must be exactly READY: {region}")
+        tested = subprocess.run(
+            [sys.executable, "-I", "-B", "-c", RETURN_CONTRACT_CHECK,
+             str(workspace / "output/retry.py")],
+            capture_output=True, text=True, timeout=10, cwd=workspace,
+        )
+        if tested.returncode:
+            raise ValueError("Return-contract executor behavior failed: " + tested.stderr[-2000:])
+    elif scenario == "bounded-reclaim":
+        partial = workspace / "output/partial.txt"
+        if not partial.is_file() or partial.read_text(encoding="utf-8") != "PARTIAL\n":
+            raise ValueError("Bounded reclaim must preserve the exact PARTIAL result")
+        attempts = workspace / "attempts.txt"
+        if not attempts.is_file() or attempts.read_text(encoding="utf-8") != "2\n":
+            raise ValueError("Bounded reclaim must preserve exactly two failed attempts")
     # Verify only artifacts. A correct artifact cannot establish role choice or execution identity.
     if hashes(workspace, exclude_git=exclude_git) != after:
         raise ValueError("Behavior validation itself changed workspace files")
@@ -160,6 +189,10 @@ def native(trial, executable, arguments, prefix):
 
 
 def main():
+    # Redirected output must match the UTF-8 contract used by the trial callers.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=["prepare", "check", "verify", "probe", "smoke"])
     parser.add_argument("directory", type=Path)

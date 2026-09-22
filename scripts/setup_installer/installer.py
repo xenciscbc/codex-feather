@@ -7,7 +7,7 @@ from .bundle import Bundle, digest, validate_target
 from .environment import Environment, find_codex
 from .discovery import reuse_candidate
 from .transaction import Plan, read_regular
-from . import entrances
+from . import entrances, diagnostics
 from .conflicts import ConflictError
 from .handoff_runtime import inspect_python
 
@@ -42,7 +42,13 @@ def execute(action: str, environment: Environment, bundle: Bundle, components: l
         old = state["components"].get(component)
         if action == "check" and old and old.get("entrance"):
             report["entrances"][component] = entrances.inspect(environment, component, old["entrance"])
-        existing = reuse_candidate(environment, component) if action != "remove" else None
+        try:
+            existing = reuse_candidate(environment, component) if action != "remove" else None
+        except (OSError, ValueError) as error:
+            if action != "check":
+                raise
+            report["components"][component] = {"status": "conflict", "message": str(error), "paths": []}
+            continue
         if existing:
             if action == "update":
                 raise ValueError(f"Component {component} is reused from {existing}; update its owning scope explicitly")
@@ -138,8 +144,9 @@ def execute(action: str, environment: Environment, bundle: Bundle, components: l
             if backup:
                 report["backup"] = str(backup)
     if action == "check":
-        report["status"] = "attention-required" if any(item["status"] in {"conflict", "missing", "shadowed"}
-                                                         for category in ["components", "entrances"]
+        report["runtime"] = diagnostics.inspect(environment, report["components"], codex)
+        report["status"] = "attention-required" if any(item["status"] in {"conflict", "missing", "shadowed", "unavailable", "disabled", "invalid"}
+                                                         for category in ["components", "entrances", "runtime"]
                                                          for item in report[category].values()) else "ok"
     if action == "check" and "handoff" in components:
         runtime = inspect_python()

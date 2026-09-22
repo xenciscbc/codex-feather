@@ -23,11 +23,20 @@ def show(report: dict, structured: bool = False, stream: TextIO | None = None) -
     for name in components:
         detail = components[name] if isinstance(components, dict) else {}
         print(f"  {name}: {detail.get('status', label)}", file=stream)
+        if detail.get("message"):
+            print(f"    {detail['message']}", file=stream)
         if detail.get("status") == "reused":
             for path in detail["paths"]:
                 print(f"    using {path}", file=stream)
     for name, entry in report.get("entrances", {}).items():
         print(f"  {name} entrance ({entry['scope']}): {entry['path']} [{entry['status']}]", file=stream)
+    for name, detail in report.get("runtime", {}).items():
+        print(f"  {name}: {detail['status']}", file=stream)
+        for field in ["version", "path", "source", "message"]:
+            if detail.get(field):
+                print(f"    {detail[field]}", file=stream)
+        for issue in detail.get("issues", []):
+            print(f"    {issue}", file=stream)
     for change in report.get("changes", []):
         print(f"  {change['action'].upper()} {change['path']}", file=stream)
     if not report.get("changes") and label != "check":

@@ -5,13 +5,23 @@ import os
 from pathlib import Path
 import stat
 import subprocess
-import tempfile
+import secrets
 
 
 class HandoffError(ValueError):
     def __init__(self, code: str, message: str):
         super().__init__(message)
         self.code = code
+
+
+def git_environment() -> dict[str, str]:
+    """Keep a parent Git process from redirecting the explicitly selected project."""
+    environment = dict(os.environ)
+    for key in ("GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE",
+                "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_NAMESPACE"):
+        environment.pop(key, None)
+    environment.update(GIT_OPTIONAL_LOCKS="0", LC_ALL="C")
+    return environment
 
 
 def check_path(path: Path) -> None:
@@ -38,7 +48,7 @@ def project_root(value: str) -> Path:
         result = subprocess.run(
             ["git", "-c", f"safe.directory={path.as_posix()}", "-C", str(path),
              "rev-parse", "--show-toplevel"], capture_output=True, text=True,
-            encoding="utf-8", timeout=5,
+            encoding="utf-8", timeout=5, env=git_environment(),
         )
         if result.returncode == 0:
             path = Path(result.stdout.strip())
@@ -118,9 +128,19 @@ def replace_file(snapshot: Snapshot, data: bytes) -> Snapshot:
         return snapshot
     temporary: Path | None = None
     try:
-        with tempfile.NamedTemporaryFile(prefix=".feather-", suffix=".tmp", dir=snapshot.path.parent,
-                                         delete=False) as handle:
-            temporary = Path(handle.name)
+        # Windows tempfile may retry PermissionError up to TMP_MAX even when a
+        # sandbox denies writes. Only actual name collisions warrant a retry.
+        for _ in range(3):
+            candidate = snapshot.path.parent / f".feather-{secrets.token_hex(16)}.tmp"
+            try:
+                descriptor = os.open(candidate, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0), 0o600)
+            except FileExistsError:
+                continue
+            temporary = candidate
+            break
+        else:
+            raise HandoffError("temporary-conflict", "Temporary name collisions; source preserved, retry later")
+        with os.fdopen(descriptor, "wb") as handle:
             handle.write(data)
             handle.flush()
             os.fsync(handle.fileno())

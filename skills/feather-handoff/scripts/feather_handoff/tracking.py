@@ -1,7 +1,7 @@
 """Respect existing Git tracking choices when recording handoffs."""
 import subprocess
 
-from .storage import HandoffError, Store, check_path, create_file, read_file, replace_file
+from .storage import HandoffError, Store, check_path, create_file, read_file, replace_file, git_environment
 
 
 RULE = "/.feather/handoffs/"
@@ -10,7 +10,7 @@ RULE = "/.feather/handoffs/"
 def git(store: Store, *arguments: str) -> subprocess.CompletedProcess:
     return subprocess.run(["git", "-c", f"safe.directory={store.project.as_posix()}", "-C",
                            str(store.project), *arguments], capture_output=True, text=True,
-                          encoding="utf-8", timeout=5)
+                          encoding="utf-8", timeout=5, env=git_environment())
 
 
 def ensure_tracking(store: Store, work: str, choice: str) -> str:
