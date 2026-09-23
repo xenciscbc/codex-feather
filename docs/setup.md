@@ -1,5 +1,7 @@
 # Feather 獨立安裝器
 
+原生 plugin 使用者請先看 [plugin 設定流程](plugin.md)：plugin 提供兩個 skills，`feather-setup` 使用相同安裝器管理外部角色與分工入口。以下是獨立離線包的完整操作說明。
+
 `feather-setup` 以完整離線包安裝、檢查、更新、移除或遷移 Feather。可選 `delegation`（四角色）及 `handoff`（交接 skill），`all` 表示整套。安裝器不安裝 Codex、不登入帳號，也不在安裝途中下載元件。
 
 ## 取得與啟動

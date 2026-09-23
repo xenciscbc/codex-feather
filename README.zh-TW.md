@@ -11,6 +11,21 @@
 
 ## 安裝
 
+### 原生 Codex plugin
+
+Repository 現在包含 `feather-handoff` 與 `feather-setup` 兩個 skills 的 plugin 封裝。此版本發布後，可透過 Git marketplace 安裝：
+
+```powershell
+codex plugin marketplace add xenciscbc/codex-feather
+codex plugin add codex-feather@codex-feather
+```
+
+開新 session，說「使用 feather-setup 設定目前專案」或指定全域使用。Setup 會沿用既有安裝器，預覽並部署四角色與分工指引；單純安裝 plugin 不會寫入這些外部設定。來源 setup 需要 Python 3.11+ 與 PyYAML（`requirements-setup.txt`）。
+
+更新 plugin 後，再請 setup 同步外部設定；移除 plugin 前，先讓 setup 清理受管理的角色與入口。既有獨立交接 skill 須明確選擇切換，setup 不會再安裝重複副本。詳見 [plugin 設定與生命週期](docs/plugin.md)。`v1.0.1` 及更早 tag 不含本次 plugin 封裝。
+
+### 獨立安裝器
+
 先準備好 Codex；交接功能另需 Python 3.11+。安裝器本身不需要 Python。
 
 1. 依 [安裝說明](docs/setup.md) 取得或建置對應平台的完整安裝包。

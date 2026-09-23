@@ -11,6 +11,21 @@ Handoffs live in Markdown files inside the project. The tool uses the Python sta
 
 ## Installation
 
+### Native Codex plugin
+
+The repository now packages `feather-handoff` and `feather-setup` as a native plugin. Once this version is published, install it through the Git marketplace:
+
+```sh
+codex plugin marketplace add xenciscbc/codex-feather
+codex plugin add codex-feather@codex-feather
+```
+
+Start a new session and ask **“Use feather-setup to configure Feather for this project”** or specify user scope. Setup previews and applies custom roles and agent guidance using the existing installer; installing the plugin alone does not write them. Source setup requires Python 3.11+ and PyYAML (`requirements-setup.txt`).
+
+After refreshing the plugin, ask setup to update the external configuration. Before uninstalling the plugin, ask setup to remove those managed files. Existing standalone handoff skills require an explicit transition; setup does not install a duplicate. See [plugin setup and lifecycle](docs/plugin.md). Tags through `v1.0.1` do not contain this plugin packaging.
+
+### Standalone installer
+
 Install Codex first. Handoff commands also require Python 3.11+; the packaged installer itself does not require Python.
 
 1. Follow the [installation guide](docs/setup.md) to obtain or build a complete package for your platform.

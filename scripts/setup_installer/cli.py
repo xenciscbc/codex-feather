@@ -17,7 +17,7 @@ from . import interactive
 from .reporting import show
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     # Frozen Python ignores PYTHONUTF8; the CLI's redirected JSON must still be UTF-8 on Windows.
     for stream in (sys.stdout, sys.stderr):
         if isinstance(stream, io.TextIOWrapper):
@@ -39,11 +39,12 @@ def main() -> int:
     parser.add_argument("--from", dest="source_scope", choices=["project", "user"])
     parser.add_argument("--to", dest="target_scope", choices=["project", "user"])
     parser.add_argument("--interactive", action="store_true", help="Guide missing choices and preview before applying")
-    args = parser.parse_args()
+    arguments = sys.argv[1:] if argv is None else argv
+    args = parser.parse_args(arguments)
     try:
         guided = args.action is None or args.interactive
         if guided:
-            interactive.choose(args, sys.argv[1:])
+            interactive.choose(args, arguments)
         if args.action != "migrate" and (args.source_scope is not None or args.target_scope is not None):
             raise ValueError("--from and --to belong to migrate; choose the migration operation explicitly")
         if args.action in {"check", "remove"} and args.entrance != "none":

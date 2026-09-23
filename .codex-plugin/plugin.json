@@ -1,0 +1,19 @@
+{
+  "name": "codex-feather",
+  "version": "1.1.0",
+  "description": "Delegate bounded work and preserve resumable handoffs, with guided setup for native Codex roles.",
+  "author": {
+    "name": "xenciscbc"
+  },
+  "skills": "./skills/",
+  "repository": "https://github.com/xenciscbc/codex-feather",
+  "interface": {
+    "displayName": "Codex Feather",
+    "shortDescription": "Guided role setup and resumable work handoffs.",
+    "longDescription": "Includes feather-handoff and feather-setup. Install the plugin, then ask Feather setup to deploy or update custom roles and agent guidance in your selected scope.",
+    "developerName": "xenciscbc",
+    "category": "Productivity",
+    "capabilities": ["Read", "Write"],
+    "defaultPrompt": ["Set up Feather for this project.", "Check my Feather installation.", "Save a handoff for this task."]
+  }
+}

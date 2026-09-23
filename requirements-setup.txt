@@ -1,0 +1,2 @@
+# Python runtime dependency for the source/plugin setup tool.
+PyYAML==6.0.3

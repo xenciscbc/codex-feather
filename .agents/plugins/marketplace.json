@@ -1,0 +1,21 @@
+{
+  "name": "codex-feather",
+  "interface": {
+    "displayName": "Feather"
+  },
+  "plugins": [
+    {
+      "name": "codex-feather",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/xenciscbc/codex-feather.git",
+        "ref": "master"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

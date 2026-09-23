@@ -1,4 +1,4 @@
 # Source/build/type-check dependencies; end users run the bundled runtime.
-PyYAML==6.0.3
+-r requirements-setup.txt
 PyInstaller==6.16.0
 mypy==1.18.2
