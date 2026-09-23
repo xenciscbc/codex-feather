@@ -7,7 +7,7 @@ import subprocess
 import unittest
 from unittest.mock import patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "skills/feather-handoff/scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "skills/handoff/scripts"))
 from feather_handoff import storage
 
 

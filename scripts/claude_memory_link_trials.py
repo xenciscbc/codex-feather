@@ -16,7 +16,7 @@ from handoff_trials import git
 SCENARIOS = {
     "claude-memory-links": {
         "fixture": "handoff", "roles": [], "writes": [],
-        "prompt": "Use $feather-handoff to find handoff records in the explicit Claude memory "
+        "prompt": "Use $handoff to find handoff records in the explicit Claude memory "
                   "directory 'memory' for the explicit project root 'project', both relative to "
                   "this workspace. Follow only memory's explicit links to actual handoff files "
                   "inside that project. Summarize only, with one Markdown heading per work, linked "
@@ -31,7 +31,7 @@ SCENARIOS = {
     },
     "claude-memory-links-unknown": {
         "fixture": "handoff", "roles": [], "writes": [],
-        "prompt": "Use $feather-handoff to find handoff records in the explicit Claude memory "
+        "prompt": "Use $handoff to find handoff records in the explicit Claude memory "
                   "directory 'memory' relative to this workspace. No project path or confirmed "
                   "project association is available. Search memory itself and list links outside "
                   "it with that limitation. Summarize only, with one Markdown heading per work, "
@@ -44,7 +44,7 @@ SCENARIOS = {
     },
     "claude-memory-links-alias": {
         "fixture": "handoff", "roles": [], "writes": [],
-        "prompt": "Use $feather-handoff to find handoff records in the explicit Claude memory "
+        "prompt": "Use $handoff to find handoff records in the explicit Claude memory "
                   "directory 'memory' for the explicit project root 'project', both relative to "
                   "this workspace. Resolve every target and its ancestor links before reading. "
                   "Summarize only, with one Markdown heading per work, linked sources, concrete "
@@ -57,7 +57,7 @@ SCENARIOS = {
     },
     "claude-memory-project-links": {
         "fixture": "handoff", "roles": [], "writes": [],
-        "prompt": "Use $feather-handoff to find handoff records in Claude memory for project "
+        "prompt": "Use $handoff to find handoff records in Claude memory for project "
                   "'project' relative to this workspace. Its trusted Claude configuration root is "
                   "'claude-config'; there are no managed settings or launch overrides, and the "
                   "project settings are trusted. Locate memory first, then follow only its explicit "

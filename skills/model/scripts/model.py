@@ -60,7 +60,7 @@ def _owner(environment: Environment, plan: Plan):
             for role, path in zip(ROLES, targets):
                 current = plan.read(path)
                 if current is None or digest(current) != record["files"][f".codex/agents/{role}.toml"]:
-                    raise ValueError(f"Managed role changed or disappeared: {path}; resolve with feather-setup before changing defaults")
+                    raise ValueError(f"Managed role changed or disappeared: {path}; resolve with setup before changing defaults")
                 native = tomllib.loads(current.decode("utf-8-sig"))
                 if "model" in native or "model_reasoning_effort" in native:
                     raise ValueError(f"Native role binding overrides Feather dispatch defaults: {path}; update the managed role installation first")
@@ -124,7 +124,7 @@ def run(action: str, environment: Environment, raw: list[str], expected_plan: st
         for role, fields in overrides.items():
             for field, override in fields.items():
                 if current[role][field] != override:
-                    raise ValueError(f"Managed role table and ownership state disagree for {role}.{field}; resolve with feather-setup")
+                    raise ValueError(f"Managed role table and ownership state disagree for {role}.{field}; resolve with setup")
     else:
         current = values((SOURCE_ROOT / "templates/AGENTS.md").read_text(encoding="utf-8-sig"))
     owner_info: dict = {"scope": owner.scope, "state_path": str(owner.state_path),
@@ -134,7 +134,7 @@ def run(action: str, environment: Environment, raw: list[str], expected_plan: st
     if action == "show":
         return report
     if not entrance:
-        raise ValueError("No managed delegation entrance is active. Attach one at the owning scope with feather-setup --entrance before saving permanent defaults")
+        raise ValueError("No managed delegation entrance is active. Attach one at the owning scope with setup --entrance before saving permanent defaults")
     updated = copy.deepcopy(current)
     for role, fields in assignments.items():
         updated[role].update(fields)

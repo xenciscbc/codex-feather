@@ -6,7 +6,10 @@ from pathlib import Path, PurePosixPath
 import tomllib
 
 
-ROLES = ("scout", "analyst", "mech-executor", "executor")
+ROLES = ("scout", "analyst", "mech-executor", "executor", "security-executor")
+LEGACY_ROLES = ROLES[:-1]
+HANDOFF_ROOT = ".agents/skills/handoff/"
+LEGACY_HANDOFF_ROOT = ".agents/skills/feather-handoff/"
 
 
 def digest(content: bytes) -> str:
@@ -51,17 +54,17 @@ class Bundle:
             if len({target.casefold() for target in targets}) != len(targets):
                 raise ValueError(f"Duplicate payload targets in {name}")
             if name == "handoff":
-                if ".agents/skills/feather-handoff/SKILL.md" not in targets:
+                if HANDOFF_ROOT + "SKILL.md" not in targets:
                     raise ValueError("Incomplete handoff payload: SKILL.md is required")
             elif name == "delegation":
                 if set(targets) != {f".codex/agents/{role}.toml" for role in ROLES} or "assets/templates/AGENTS.md" not in payload:
-                    raise ValueError("Incomplete delegation payload: all four roles and their guidance are required")
+                    raise ValueError("Incomplete delegation payload: all five roles and their guidance are required")
             else:
                 raise ValueError(f"Unknown bundle component: {name}")
             for source, target in component["files"].items():
                 if source not in manifest["files"]:
                     raise ValueError(f"Unverified payload: {source}")
-                validate_target(name, target)
+                validate_target(name, target, bundled=True)
                 if name == "delegation":
                     role = tomllib.loads(payload[source].decode("utf-8-sig"))
                     if role.get("name") != Path(target).stem or not role.get("description") or not role.get("developer_instructions"):
@@ -73,9 +76,10 @@ class Bundle:
                 for source, target in self.components[component]["files"].items()}
 
 
-def validate_target(component: str, target: str) -> None:
+def validate_target(component: str, target: str, *, bundled: bool = False) -> None:
     relative_path(target)
-    if component == "handoff" and target.startswith(".agents/skills/feather-handoff/"):
+    if component == "handoff" and (target.startswith(HANDOFF_ROOT)
+                                   or (not bundled and target.startswith(LEGACY_HANDOFF_ROOT))):
         return
     if component == "delegation" and target in {f".codex/agents/{name}.toml" for name in ROLES}:
         return

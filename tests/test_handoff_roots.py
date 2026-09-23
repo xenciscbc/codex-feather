@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import test_handoff_tool as handoff_tests
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "skills/feather-handoff/scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "skills/handoff/scripts"))
 from feather_handoff import cli, storage
 from feather_handoff.writing import create_work
 

@@ -43,7 +43,7 @@ def execute(action: str, environment: Environment, bundle: Bundle, components: l
         if action == "check" and old and old.get("entrance"):
             report["entrances"][component] = entrances.inspect(environment, component, old["entrance"])
         try:
-            existing = reuse_candidate(environment, component) if action != "remove" else None
+            existing = reuse_candidate(environment, component, owned=set(old.get("files", {})) if old else None) if action != "remove" else None
         except (OSError, ValueError) as error:
             if action != "check":
                 raise
@@ -82,7 +82,7 @@ def execute(action: str, environment: Environment, bundle: Bundle, components: l
             report["components"][component] = {"status": "would-remove" if dry_run else "removed"}
             continue
         for target in files:
-            validate_target(component, target)
+            validate_target(component, target, bundled=True)
         if action == "update" and (not old or old.get("reused")):
             raise ValueError(f"No owned installation to update: {component}")
         if action in {"install", "update"}:
@@ -106,6 +106,8 @@ def execute(action: str, environment: Environment, bundle: Bundle, components: l
                                                "contents": {target: base64.b64encode(data).decode() for target, data in files.items()}}
             if component == "delegation" and old and old.get("model_overrides"):
                 state["components"][component]["model_overrides"] = old["model_overrides"]
+            if component == "delegation" and old and "review_mode" in old:
+                state["components"][component]["review_mode"] = old["review_mode"]
             if old and old.get("entrance"):
                 state["components"][component]["entrance"] = old["entrance"]
             if entrance != "none" or (old and old.get("entrance")):

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Feather Auto Off"
+  short_description: "Disable automatic review for material plans"
+  default_prompt: "Use $auto-off to disable automatic plan review for this session."

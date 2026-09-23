@@ -14,7 +14,7 @@ from handoff_trials import git
 SCENARIOS = {
     "claude-memory-direct": {
         "fixture": "handoff", "roles": [], "writes": [],
-        "prompt": "Use $feather-handoff to find handoff records in the Claude memory directory "
+        "prompt": "Use $handoff to find handoff records in the Claude memory directory "
                   "'memory' relative to this workspace. Summarize the results only. "
                   "Please give each matched work its own Markdown heading with its name, "
                   "link its source, and preserve concrete values and identifiers.",
@@ -44,7 +44,7 @@ for name, review in {
 }.items():
     SCENARIOS[f"claude-memory-{name}"] = {**SCENARIOS["claude-memory-direct"], "review": review}
 SCENARIOS["claude-memory-no-request"]["prompt"] = (
-    "Use $feather-handoff to read our pending handoff and tell me where we left off. Only report it."
+    "Use $handoff to read our pending handoff and tell me where we left off. Only report it."
 )
 SCENARIOS["claude-memory-partial"] = {
     **SCENARIOS["claude-memory-direct"],
@@ -56,7 +56,7 @@ SCENARIOS["claude-memory-partial"] = {
 }
 SCENARIOS["claude-memory-project-custom"] = {
     **SCENARIOS["claude-memory-direct"],
-    "prompt": "Use $feather-handoff to find handoff records in Claude memory for project 'project' "
+    "prompt": "Use $handoff to find handoff records in Claude memory for project 'project' "
               "relative to this workspace. Its trusted Claude configuration root is 'claude-config'. "
               "There are no managed settings or additional launch overrides for this isolated source, "
               "and the project's Claude settings are trusted. Summarize only, with one Markdown heading "

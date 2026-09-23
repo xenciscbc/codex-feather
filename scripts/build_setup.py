@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def payload(destination: Path) -> None:
     shutil.copytree(ROOT / "templates", destination / "assets/templates")
-    shutil.copytree(ROOT / "skills/feather-handoff", destination / "assets/skills/feather-handoff",
+    shutil.copytree(ROOT / "skills/handoff", destination / "assets/skills/handoff",
                     ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     files = {path.relative_to(destination).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
              for path in sorted((destination / "assets").rglob("*")) if path.is_file()}

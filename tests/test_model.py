@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-sys.path.insert(0, str(ROOT / "skills/feather-model/scripts"))
+sys.path.insert(0, str(ROOT / "skills/model/scripts"))
 
 from setup_installer.bundle import Bundle, ROLES
 from setup_installer.environment import Environment
@@ -71,6 +71,16 @@ class ModelTests(unittest.TestCase):
         self.assertEqual(state["components"]["delegation"]["model_overrides"],
                          {"scout": {"model": "other-model"}})
         self.assertNotIn(b"model =", (self.project / ".codex/agents/scout.toml").read_bytes())
+
+    def test_crlf_model_table_preserves_line_endings(self):
+        key = "assets/templates/AGENTS.md"
+        self.bundle.payload[key] = self.bundle.payload[key].replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
+        self.install()
+        self.apply("security-executor.reasoning=medium")
+        target = self.project / "AGENTS.md"
+        self.assertIn(b"| security-executor | gpt-6-sol | medium |\r\n", target.read_bytes())
+        execute("update", self.env, self.bundle, ["delegation"], None)
+        self.assertEqual(run("show", self.env, [])["roles"]["security-executor"]["reasoning"], "medium")
 
     def test_preview_is_read_only_and_fingerprint_guards_apply(self):
         self.install()
@@ -204,7 +214,7 @@ class ModelTests(unittest.TestCase):
             run("show", self.env, [])
 
     def test_cli_outputs_json_error(self):
-        script = ROOT / "skills/feather-model/scripts/model.py"
+        script = ROOT / "skills/model/scripts/model.py"
         result = subprocess.run([sys.executable, str(script), "apply", "--project", str(ROOT),
                                  "--user-home", str(self.user_home), "--codex-home", str(self.codex_home),
                                  "--set", "scout.reasoning=high"], capture_output=True, text=True, encoding="utf-8")
@@ -212,7 +222,7 @@ class ModelTests(unittest.TestCase):
         self.assertIn("expected-plan", json.loads(result.stdout)["error"])
 
     def test_cli_reports_missing_dependency_as_json(self):
-        script = ROOT / "skills/feather-model/scripts/model.py"
+        script = ROOT / "skills/model/scripts/model.py"
         result = subprocess.run([sys.executable, "-S", str(script), "show", "--project", str(ROOT)],
                                 capture_output=True, text=True, encoding="utf-8")
         self.assertEqual(result.returncode, 1)
@@ -221,9 +231,9 @@ class ModelTests(unittest.TestCase):
     def test_show_and_preview_create_no_import_cache_or_installation_files(self):
         self.install()
         plugin = self.base / "plugin"
-        destination = plugin / "skills/feather-model/scripts"
+        destination = plugin / "skills/model/scripts"
         destination.mkdir(parents=True)
-        shutil.copyfile(ROOT / "skills/feather-model/scripts/model.py", destination / "model.py")
+        shutil.copyfile(ROOT / "skills/model/scripts/model.py", destination / "model.py")
         shutil.copytree(ROOT / "scripts/setup_installer", plugin / "scripts/setup_installer",
                         ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
         (plugin / "templates").mkdir()

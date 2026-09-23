@@ -4,6 +4,7 @@ ROLES = {
     "analyst": ("gpt-6-sol", "high", "workspace-write"),
     "mech-executor": ("gpt-6-luna", "medium", "workspace-write"),
     "executor": ("gpt-6-sol", "medium", "workspace-write"),
+    "security-executor": ("gpt-6-sol", "high", "workspace-write"),
 }
 
 SCENARIOS = {

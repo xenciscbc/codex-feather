@@ -21,8 +21,8 @@ class SnapshotDeploymentTest(unittest.TestCase):
             payload(bundle_dir)
             files = Bundle.read(bundle_dir).files("handoff")
             for relative in ["scripts/feather_handoff/baseline.py", "scripts/feather_handoff/observations.py", "references/snapshots.md"]:
-                target = ".agents/skills/feather-handoff/" + relative
-                self.assertEqual(files[target], (ROOT / "skills/feather-handoff" / relative).read_bytes())
+                target = ".agents/skills/handoff/" + relative
+                self.assertEqual(files[target], (ROOT / "skills/handoff" / relative).read_bytes())
 
     def test_real_payload_installs_updates_and_removes_without_losing_baseline(self):
         native = os.environ.get("FEATHER_TEST_CODEX") or shutil.which("codex.exe" if os.name == "nt" else "codex")
@@ -38,8 +38,8 @@ class SnapshotDeploymentTest(unittest.TestCase):
             bundle = Bundle.read(bundle_dir)
             files = bundle.files("handoff")
             for relative in ["scripts/feather_handoff/baseline.py", "scripts/feather_handoff/observations.py", "references/snapshots.md"]:
-                target = ".agents/skills/feather-handoff/" + relative
-                self.assertEqual(files[target], (ROOT / "skills/feather-handoff" / relative).read_bytes())
+                target = ".agents/skills/handoff/" + relative
+                self.assertEqual(files[target], (ROOT / "skills/handoff" / relative).read_bytes())
             project = root / "project"
             project.mkdir()
             initialized = subprocess.run(["git", "-C", str(project), "init", "--initial-branch=main"],
@@ -56,7 +56,7 @@ class SnapshotDeploymentTest(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 return json.loads(result.stdout)
             setup("install")
-            tool = project / ".agents/skills/feather-handoff/scripts/handoff.py"
+            tool = project / ".agents/skills/handoff/scripts/handoff.py"
             def run(*args, data=None):
                 result = subprocess.run([sys.executable, "-B", str(tool), "--project", str(project), *args],
                     input=json.dumps(data) if data is not None else None, capture_output=True,

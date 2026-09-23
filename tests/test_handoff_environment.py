@@ -26,16 +26,16 @@ class HandoffEnvironmentTest(unittest.TestCase):
         self.user_home = self.directory / "user"
         self.codex_home = self.user_home / ".codex"
         self.bundle = self.directory / "bundle"
-        skill = self.bundle / "assets/skills/feather-handoff/SKILL.md"
+        skill = self.bundle / "assets/skills/handoff/SKILL.md"
         skill.parent.mkdir(parents=True)
-        shutil.copyfile(ROOT / "skills/feather-handoff/SKILL.md", skill)
-        source = "assets/skills/feather-handoff/SKILL.md"
+        shutil.copyfile(ROOT / "skills/handoff/SKILL.md", skill)
+        source = "assets/skills/handoff/SKILL.md"
         self.bundle.joinpath("bundle.json").write_text(json.dumps({
             "format": 1,
             "version": "0.1.0",
             "files": {source: hashlib.sha256(skill.read_bytes()).hexdigest()},
             "components": {"handoff": {"files": {
-                source: ".agents/skills/feather-handoff/SKILL.md",
+                source: ".agents/skills/handoff/SKILL.md",
             }}},
         }), encoding="utf-8")
 
@@ -137,12 +137,12 @@ class HandoffEnvironmentTest(unittest.TestCase):
         options = ["--project", str(self.project), "--user-home", str(self.user_home),
                    "--codex-home", str(self.codex_home), "--bundle", str(release),
                    "--components", "handoff", "--codex", str(CODEX), "--json"]
-        installed = self.project / ".agents/skills/feather-handoff/scripts/handoff.py"
+        installed = self.project / ".agents/skills/handoff/scripts/handoff.py"
         for action in ("install", "update"):
             result = subprocess.run([*base, action, *options], capture_output=True,
                                     text=True, encoding="utf-8", timeout=30)
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(installed.read_bytes(), (ROOT / "skills/feather-handoff/scripts/handoff.py").read_bytes())
+            self.assertEqual(installed.read_bytes(), (ROOT / "skills/handoff/scripts/handoff.py").read_bytes())
             queried = subprocess.run([sys.executable, "-B", str(installed), "--project", str(self.project), "--exact-root", "list"],
                                      capture_output=True, text=True, encoding="utf-8", timeout=15)
             self.assertEqual(queried.returncode, 0, queried.stderr)

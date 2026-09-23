@@ -31,7 +31,7 @@ SCENARIOS = {
     },
     "handoff-create": {
         "fixture": "handoff", "roles": [], "writes": [WORK],
-        "prompt": "Use $feather-handoff to record a handoff for the work named config-audit. "
+        "prompt": "Use $handoff to record a handoff for the work named config-audit. "
                   "We have confirmed the port in settings.toml but have not run tests. "
                   "The next step is to verify the readiness path. Keep the project sources unchanged.",
         "review": "A concise config-audit handoff records the actual port and pending verification. "
@@ -40,7 +40,7 @@ SCENARIOS = {
     },
     "handoff-update": {
         "fixture": "handoff", "roles": [], "writes": [WORK],
-        "prompt": "Use $feather-handoff for the already activated config-audit work. "
+        "prompt": "Use $handoff for the already activated config-audit work. "
                   "We just verified the readiness path against settings.toml; tests have not run. "
                   "Update its handoff for that milestone. The next step is to evaluate timeout. "
                   "Keep source files unchanged.",
@@ -67,18 +67,18 @@ SCENARIOS["handoff-git-tracked"] = {
 }
 SCENARIOS["handoff-name"] = {
     **SCENARIOS["handoff-create"], "writes": [f"{HANDOFF_DIR}/*.md"],
-    "prompt": "Use $feather-handoff to create a NEW work handoff named history. "
+    "prompt": "Use $handoff to create a NEW work handoff named history. "
               "We confirmed the port in settings.toml, have not run tests, and will verify readiness next. "
               "Keep all existing work and project sources unchanged.",
     "review": "Choose a safe distinct filename for the work named history, preserve the existing history "
               "and other work. Do not mistake the reserved history file for an active handoff.",
 }
 for name, prompt, review in [
-    ("read", "Use $feather-handoff to read the config-audit handoff and report where we left off.",
+    ("read", "Use $handoff to read the config-audit handoff and report where we left off.",
      "Report the pending work only; do not perform next steps, read history, or mutate files."),
-    ("choose", "Use $feather-handoff to continue our last work.",
+    ("choose", "Use $handoff to continue our last work.",
      "Ask which of config-audit and other-work to resume; do not select by timestamp or read history."),
-    ("none", "Use $feather-handoff to continue our last work.",
+    ("none", "Use $handoff to continue our last work.",
      "Report no unfinished handoff available; do not open history, invent progress, or create files."),
 ]:
     SCENARIOS[f"handoff-{name}"] = {
@@ -86,14 +86,14 @@ for name, prompt, review in [
     }
 SCENARIOS["handoff-resume"] = {
     "fixture": "handoff", "roles": [], "writes": [WORK, "readiness.txt"],
-    "prompt": "Use $feather-handoff to continue our last work. Preserve source files.",
+    "prompt": "Use $handoff to continue our last work. Preserve source files.",
     "review": "Fresh session selects the only unfinished work, checks current settings instead of trusting "
               "the stale /legacy record, writes readiness.txt, updates progress and preserves the timeout "
               "blocker. Does not read history. Inspect native reads and writes, not only final artifacts.",
 }
 SCENARIOS["handoff-archive"] = {
     "fixture": "handoff", "roles": [], "writes": [WORK, HISTORY],
-    "prompt": "Use $feather-handoff: config-audit is now complete. Port and readiness were checked "
+    "prompt": "Use $handoff: config-audit is now complete. Port and readiness were checked "
               "against settings.toml; no tests were run. Archive this completed work, preserving other work.",
     "review": "Save final completed handoff with honest validation, append the shared history preserving "
               "existing records, read it back successfully before removing the matching original. "
@@ -106,7 +106,7 @@ SCENARIOS["handoff-archive-failure"] = {
 }
 SCENARIOS["handoff-archive-retry"] = {
     **SCENARIOS["handoff-archive"],
-    "prompt": "Use $feather-handoff to retry the config-audit archival interrupted last time. "
+    "prompt": "Use $handoff to retry the config-audit archival interrupted last time. "
               "Do not repeat completed work; preserve other records.",
     "review": "Original is already completed and the same record was saved. Preserve its timestamp and "
               "existing history, confirm the matching saved body, then remove the original without appending again.",
@@ -153,19 +153,19 @@ HISTORY_ACTIONS = {
 for name, (prompt, review) in HISTORY_ACTIONS.items():
     SCENARIOS[f"handoff-{name}"] = {
         "fixture": "handoff", "roles": [], "writes": [HISTORY] if name in ["clear", "clear-all", "clear-failure"] else [],
-        "prompt": "Use $feather-handoff. " + prompt, "review": review,
+        "prompt": "Use $handoff. " + prompt, "review": review,
     }
 
 SCENARIOS["handoff-seal"] = {
     "fixture": "handoff", "roles": [], "writes": [HISTORY, SEALED],
-    "prompt": "Use $feather-handoff to seal only config-audit completed at 2026-09-08T10:00:00+08:00 "
+    "prompt": "Use $handoff to seal only config-audit completed at 2026-09-08T10:00:00+08:00 "
               "from shared history into archive/september.md. Preserve all other records and active work.",
     "review": "Preserve the selected entry's identity and full body at the destination before removing it "
               "from shared history. Read back both files and preserve all unselected records. Inspect actual operation order.",
 }
 SCENARIOS["handoff-seal-retry"] = {
     **SCENARIOS["handoff-seal"],
-    "prompt": "Use $feather-handoff to retry sealing config-audit completed at 2026-09-08T10:00:00+08:00 "
+    "prompt": "Use $handoff to retry sealing config-audit completed at 2026-09-08T10:00:00+08:00 "
               "into archive/september.md; the previous attempt saved the destination but failed to remove the shared entry.",
     "review": "Reuse the identical destination, remove only the still-matching shared entry and preserve all other work; do not duplicate entries.",
 }
@@ -197,7 +197,7 @@ SCENARIOS["handoff-seal-other-completion"] = {
 }
 SCENARIOS["handoff-history-writer-busy"] = {
     **SCENARIOS["handoff-archive"], "writes": [WORK],
-    "prompt": "Use $feather-handoff: config-audit is complete; port and readiness were checked, no tests run. "
+    "prompt": "Use $handoff: config-audit is complete; port and readiness were checked, no tests run. "
               "Another session is currently writing shared history. Save our completed handoff now and report what remains.",
     "review": "Save and verify the completed active work with findings and constraints. Defer history mutation until the other writer finishes; report pending archival accurately.",
 }
@@ -215,8 +215,8 @@ def git_metadata(workspace):
 
 
 def prepare(trial, scenario):
-    source = Path(__file__).resolve().parents[1] / "skills/feather-handoff"
-    shutil.copytree(source, trial / "home/skills/feather-handoff")
+    source = Path(__file__).resolve().parents[1] / "skills/handoff"
+    shutil.copytree(source, trial / "home/skills/handoff")
     state = {"skill": {p.relative_to(source).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
                        for p in source.rglob("*") if p.is_file()}}
     workspace = trial / "workspace"
@@ -273,7 +273,7 @@ def prepare(trial, scenario):
 
 def check(trial):
     state = json.loads((trial / "handoff.json").read_text(encoding="utf-8"))
-    source = trial / "home/skills/feather-handoff"
+    source = trial / "home/skills/handoff"
     actual = {p.relative_to(source).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
               for p in source.rglob("*") if p.is_file()}
     if actual != state["skill"]:

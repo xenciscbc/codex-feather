@@ -14,7 +14,7 @@ python scripts/trial.py prepare .scratch/feather-mvp/runs/my-scout --scenario sc
 python scripts/trial.py check .scratch/feather-mvp/runs/my-scout
 ```
 
-每個情境都使用新的目錄；既有目錄拒絕覆寫。入口建立獨立 `home`、四份角色、最小 config、workspace、基準雜湊與 `review.json`，不複製真實設定、憑證或 hook。目前 manifest 為 format=3；舊格式試用目錄請重新準備，原始證據保留。
+每個情境都使用新的目錄；既有目錄拒絕覆寫。入口建立獨立 `home`、五份角色、最小 config、workspace、基準雜湊與 `review.json`，不複製真實設定、憑證或 hook。目前 manifest 為 format=3；舊格式試用目錄請重新準備，原始證據保留。
 
 ## 同一入口的分工情境
 
@@ -35,7 +35,7 @@ python scripts/trial.py check .scratch/feather-mvp/runs/my-scout
 | direct-global | 主 Agent 綜合時間與預算限制選 A |
 | generic | 通用子 Agent 創作三個雙字名稱，主 Agent 提供選擇理由 |
 | coordination | 獨立查找／分析、依賴與共享檔案依序寫入、缺規格阻塞、重新分工、矛盾整合 |
-| return-contract | 四角色與通用子任務回傳五項資訊；主 Agent 驗收成果並拒收缺必要理由的 completed 聲明 |
+| return-contract | 五角色與通用子任務回傳五項資訊；主 Agent 驗收成果並拒收缺必要理由的 completed 聲明 |
 | bounded-reclaim | 部分成果後同原因兩次失敗；停止後收回，保留部分成果，不執行第三次嘗試 |
 
 每個試用的 `review.json` 含具體人工验收準則。素材及規格位於 `tests/fixtures/`；已知答案和工程行為檢查位於 workspace 外的 `scripts/scenarios.py`。
@@ -69,7 +69,7 @@ python scripts/trial.py smoke .scratch/feather-mvp/runs/my-scout --codex $feathe
 python scripts/trial.py verify .scratch/feather-mvp/runs/my-scout
 ```
 
-`check` 檢查四角色配置及原始素材未變；`verify` 容許情境指定的寫入，檢查範圍外的新增／刪除／修改，並驗證批次結果、工程函式行為、協調檔案內容。executor 的 verify 會在子 Python 程序中執行生成的 retry.py；這是程式測試，不是模型呼叫。Python 編譯檢查是語法檢查，並非型別檢查；安裝器另外執行 mypy，既有試用工具的驗收方式維持不變。
+`check` 檢查五角色配置及原始素材未變；`verify` 容許情境指定的寫入，檢查範圍外的新增／刪除／修改，並驗證批次結果、工程函式行為、協調檔案內容。executor 的 verify 會在子 Python 程序中執行生成的 retry.py；這是程式測試，不是模型呼叫。Python 編譯檢查是語法檢查，並非型別檢查；安裝器另外執行 mypy，既有試用工具的驗收方式維持不變。
 
 所有唯讀／創作／分析答案及派工行為仍由 `review.json` 準則檢閱原生事件與最終回覆。`artifacts: pass` 只表示檔案成果通過，不能證明選角正確、從未寫入後還原、工作是否並行或模型綁定。
 
@@ -90,7 +90,7 @@ python scripts/trial.py verify .scratch/feather-mvp/runs/my-scout
 
 ## 最小手動配置
 
-僅在新的隔離 home 試用：把四份 `templates/*.toml` 放入 `home/agents/`，把候選 `templates/AGENTS.md` 放入 workspace，在 home config 設定 `agents.enabled = true`。建議使用 prepare 產生含 `.feather-root` 根目錄標記的相同配置。
+僅在新的隔離 home 試用：把五份 `templates/*.toml` 放入 `home/agents/`，把候選 `templates/AGENTS.md` 放入 workspace，在 home config 設定 `agents.enabled = true`。建議使用 prepare 產生含 `.feather-root` 根目錄標記的相同配置。
 
 檢查同名角色、同層 `AGENTS.override.md`、專案 `.codex/agents/` 與生效指令優先順序；發現衝突使用新隔離目錄，不覆寫既有配置。角色檔若殘留 model/reasoning 會蓋過派工參數，靜態檢查將拒絕這類配置；AGENTS.md 的預設文字仍須由主 Agent 轉成原生參數，不能當作已執行證據。即時權限覆寫可能覆蓋角色 sandbox，混合可寫／唯讀情境須檢閱實際權限和副作用。
 

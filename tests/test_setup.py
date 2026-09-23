@@ -45,9 +45,9 @@ class SetupTest(unittest.TestCase):
         self.user_home = self.directory / "user"
         self.codex_home = self.user_home / ".codex"
         self.bundle = self.directory / "bundle"
-        skill = self.bundle / "assets/skills/feather-handoff/SKILL.md"
+        skill = self.bundle / "assets/skills/handoff/SKILL.md"
         skill.parent.mkdir(parents=True)
-        shutil.copyfile(ROOT / "skills/feather-handoff/SKILL.md", skill)
+        shutil.copyfile(ROOT / "skills/handoff/SKILL.md", skill)
         self.write_manifest()
 
     def write_manifest(self, version="0.1.0"):
@@ -136,8 +136,8 @@ class SetupTest(unittest.TestCase):
         instructions.write_text("# My instructions\nKeep this file.\n", encoding="utf-8")
         result = self.run_setup("install")
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
-        deployed = self.project / ".agents/skills/feather-handoff/SKILL.md"
-        self.assertEqual(deployed.read_bytes(), (ROOT / "skills/feather-handoff/SKILL.md").read_bytes())
+        deployed = self.project / ".agents/skills/handoff/SKILL.md"
+        self.assertEqual(deployed.read_bytes(), (ROOT / "skills/handoff/SKILL.md").read_bytes())
         self.assertEqual(instructions.read_text(encoding="utf-8"), "# My instructions\nKeep this file.\n")
         self.assertEqual((self.project / "notes.txt").read_text(), "keep my project\n")
         self.assertFalse((self.project / ".feather/handoffs").exists())
@@ -167,11 +167,11 @@ class SetupTest(unittest.TestCase):
         self.assertEqual(json.loads(second.stdout)["changes"], [])
 
     def test_all_destinations_are_checked_before_any_payload_is_written(self):
-        extra = self.bundle / "assets/skills/feather-handoff/zz-references/usage.md"
+        extra = self.bundle / "assets/skills/handoff/zz-references/usage.md"
         extra.parent.mkdir()
         extra.write_text("reference", encoding="utf-8")
         self.write_manifest()
-        existing = self.project / ".agents/skills/feather-handoff/zz-references"
+        existing = self.project / ".agents/skills/handoff/zz-references"
         existing.parent.mkdir(parents=True)
         existing.write_text("my unrelated file", encoding="utf-8")
         result = self.run_setup("install")
@@ -183,7 +183,7 @@ class SetupTest(unittest.TestCase):
     def test_state_write_failure_rolls_back_deployed_skill(self):
         result = self.run_setup("install", fail_replace=("state.json",))
         self.assertNotEqual(result.returncode, 0, result.stdout)
-        self.assertFalse((self.project / ".agents/skills/feather-handoff/SKILL.md").exists())
+        self.assertFalse((self.project / ".agents/skills/handoff/SKILL.md").exists())
         self.assertFalse((self.project / ".feather/setup/state.json").exists())
         report = json.loads(result.stderr)
         self.assertEqual(report["recovery"], "rolled_back")
@@ -195,7 +195,7 @@ class SetupTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         report = json.loads(result.stderr)
         self.assertEqual(report["recovery"], "incomplete")
-        remaining = self.project / ".agents/skills/feather-handoff/SKILL.md"
+        remaining = self.project / ".agents/skills/handoff/SKILL.md"
         self.assertTrue(remaining.exists())
         self.assertIn(str(remaining), [item["path"] for item in report["remaining"]])
         journal = json.loads((Path(report["backup"]) / "journal.json").read_text())
@@ -209,7 +209,7 @@ class SetupTest(unittest.TestCase):
         self.assertFalse((self.project / ".feather").exists())
 
     def test_modified_or_unowned_skill_is_preserved(self):
-        target = self.project / ".agents/skills/feather-handoff/SKILL.md"
+        target = self.project / ".agents/skills/handoff/SKILL.md"
         target.parent.mkdir(parents=True)
         target.write_text("my existing skill", encoding="utf-8")
         result = self.run_setup("install")
@@ -235,15 +235,15 @@ class SetupTest(unittest.TestCase):
         rendered = render_messages(messages)
         self.assertIn("<!-- feather-setup:handoff:begin -->", rendered)
         self.assertIn("Native override probe.", rendered)
-        self.assertEqual(skill_paths(rendered, "feather-handoff"),
-                         [(self.project / ".agents/skills/feather-handoff/SKILL.md").resolve()])
+        self.assertEqual(skill_paths(rendered, "handoff"),
+                         [(self.project / ".agents/skills/handoff/SKILL.md").resolve()])
 
     def test_packaged_installer_runs_without_python_on_path(self):
         if not os.environ.get("FEATHER_TEST_INSTALLER"):
             self.skipTest("Run this check against the standalone release")
         result = self.run_setup("install", environment={"PATH": "", "PYTHONHOME": str(self.directory / "no-python")})
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertTrue((self.project / ".agents/skills/feather-handoff/SKILL.md").is_file())
+        self.assertTrue((self.project / ".agents/skills/handoff/SKILL.md").is_file())
 
     def test_delegation_selection_preserves_model_and_parallel_preferences(self):
         self.add_delegation()
@@ -254,10 +254,10 @@ class SetupTest(unittest.TestCase):
         result = self.run_setup("install", "--components", "delegation")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(config.read_text(encoding="utf-8"), original)
-        for role in ["scout", "analyst", "mech-executor", "executor"]:
+        for role in ["scout", "analyst", "mech-executor", "executor", "security-executor"]:
             self.assertEqual((self.project / f".codex/agents/{role}.toml").read_bytes(),
                              (ROOT / f"templates/{role}.toml").read_bytes())
-        self.assertFalse((self.project / ".agents/skills/feather-handoff").exists())
+        self.assertFalse((self.project / ".agents/skills/handoff").exists())
         self.assertFalse((self.project / "AGENTS.md").exists())
 
     def test_all_components_install_as_one_operation(self):
@@ -292,7 +292,7 @@ class SetupTest(unittest.TestCase):
         request = capture_tools(CODEX, self.project, self.user_home, self.codex_home)
         registered = registered_tools(request)
         tools = json.dumps(registered, ensure_ascii=False)
-        for role in ["scout", "analyst", "mech-executor", "executor"]:
+        for role in ["scout", "analyst", "mech-executor", "executor", "security-executor"]:
             self.assertTrue(role in tools, f"Native tool registration missing {role}; registered types: {[item.get('name') for item in registered]}")
 
     def test_role_write_failure_rolls_back_the_other_selected_component(self):
@@ -300,7 +300,7 @@ class SetupTest(unittest.TestCase):
         result = self.run_setup("install", "--components", "all", fail_replace=("executor.toml",))
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(json.loads(result.stderr)["recovery"], "rolled_back")
-        self.assertFalse((self.project / ".agents/skills/feather-handoff/SKILL.md").exists())
+        self.assertFalse((self.project / ".agents/skills/handoff/SKILL.md").exists())
         self.assertFalse((self.project / ".codex/agents/analyst.toml").exists())
         self.assertFalse((self.project / ".feather/setup/state.json").exists())
 
@@ -308,9 +308,9 @@ class SetupTest(unittest.TestCase):
         custom_home = self.directory / "custom-codex-home"
         result = self.run_setup("install", "--scope", "user", "--codex-home", custom_home)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertTrue((self.user_home / ".agents/skills/feather-handoff/SKILL.md").is_file())
+        self.assertTrue((self.user_home / ".agents/skills/handoff/SKILL.md").is_file())
         self.assertTrue((custom_home / "feather-setup/state.json").is_file())
-        self.assertFalse((custom_home / "skills/feather-handoff").exists())
+        self.assertFalse((custom_home / "skills/handoff").exists())
         self.assertFalse((self.project / ".agents").exists())
         report = json.loads(self.run_setup("check", "--scope", "user", "--codex-home", custom_home).stdout)
         self.assertEqual(report["components"]["handoff"]["status"], "installed")
@@ -372,7 +372,7 @@ class SetupTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         installed = override.read_bytes()
         self.assertTrue(installed.startswith(original))
-        self.assertIn(b"feather-handoff", installed)
+        self.assertIn(b"handoff", installed)
         self.assertIn(b"only the main Agent may delegate", installed)
         self.assertEqual(ordinary.read_bytes(), b"ordinary instructions\r\n")
         result = self.run_setup("install", "--components", "all", "--entrance", "project")
@@ -387,7 +387,7 @@ class SetupTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         entry = self.codex_home / "AGENTS.md"
         self.assertIn("only when", entry.read_text())
-        self.assertFalse((self.user_home / ".agents/skills/feather-handoff").exists())
+        self.assertFalse((self.user_home / ".agents/skills/handoff").exists())
         (self.project / ".feather-root").touch()
         (self.codex_home / "config.toml").write_text(
             'project_root_markers = [".feather-root"]\n'
@@ -402,7 +402,7 @@ class SetupTest(unittest.TestCase):
         request = capture_tools(CODEX, other, self.user_home, self.codex_home)
         rendered = render_messages(request.get("input", []))
         self.assertIn("only when", rendered)
-        self.assertEqual(skill_paths(rendered, "feather-handoff"), [])
+        self.assertEqual(skill_paths(rendered, "handoff"), [])
 
     def test_entrance_conflict_and_write_failure_leave_no_partial_install(self):
         target = self.project / "AGENTS.md"
@@ -415,7 +415,7 @@ class SetupTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(json.loads(result.stderr)["recovery"], "rolled_back")
         self.assertEqual(target.read_bytes(), b"my rules\r\n")
-        self.assertFalse((self.project / ".agents/skills/feather-handoff/SKILL.md").exists())
+        self.assertFalse((self.project / ".agents/skills/handoff/SKILL.md").exists())
 
     def test_modified_managed_entrance_is_preserved(self):
         self.assertEqual(self.run_setup("install", "--entrance", "project").returncode, 0)
@@ -450,7 +450,7 @@ class SetupTest(unittest.TestCase):
     def test_update_preserves_unselected_components_and_updates_entry_from_bundle(self):
         self.add_delegation()
         self.assertEqual(self.run_setup("install", "--components", "all", "--entrance", "user").returncode, 0)
-        skill = self.project / ".agents/skills/feather-handoff/SKILL.md"
+        skill = self.project / ".agents/skills/handoff/SKILL.md"
         original_skill = skill.read_bytes()
         role = self.bundle / "assets/templates/analyst.toml"
         role.write_bytes(role.read_bytes() + b"\n# new release\n")
@@ -474,10 +474,10 @@ class SetupTest(unittest.TestCase):
 
     def test_update_conflicts_preserve_bytes_until_explicit_replace_with_backup(self):
         self.assertEqual(self.run_setup("install", "--entrance", "project").returncode, 0)
-        skill = self.project / ".agents/skills/feather-handoff/SKILL.md"
+        skill = self.project / ".agents/skills/handoff/SKILL.md"
         customized = skill.read_bytes() + b"\nMy custom skill rule.\n"
         skill.write_bytes(customized)
-        source = self.bundle / "assets/skills/feather-handoff/SKILL.md"
+        source = self.bundle / "assets/skills/handoff/SKILL.md"
         source.write_bytes(source.read_bytes() + b"\nNew release.\n")
         self.write_manifest("0.2.0")
         result = self.run_setup("update")
@@ -511,12 +511,12 @@ class SetupTest(unittest.TestCase):
         self.assertIn(b"feather-setup:delegation:begin", target.read_bytes())
 
     def test_update_deletes_only_obsolete_owned_payload_and_rolls_back_all_changes(self):
-        extra = self.bundle / "assets/skills/feather-handoff/obsolete.md"
+        extra = self.bundle / "assets/skills/handoff/obsolete.md"
         extra.write_bytes(b"old auxiliary file")
         self.write_manifest()
         self.assertEqual(self.run_setup("install", "--entrance", "project").returncode, 0)
         extra.unlink()
-        source = self.bundle / "assets/skills/feather-handoff/SKILL.md"
+        source = self.bundle / "assets/skills/handoff/SKILL.md"
         source.write_bytes(source.read_bytes() + b"\nNew release.\n")
         self.write_manifest("0.2.0")
         before = {p.relative_to(self.project): p.read_bytes() for p in self.project.rglob("*")
@@ -529,7 +529,7 @@ class SetupTest(unittest.TestCase):
         self.assertEqual(after, before)
         result = self.run_setup("update")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertFalse((self.project / ".agents/skills/feather-handoff/obsolete.md").exists())
+        self.assertFalse((self.project / ".agents/skills/handoff/obsolete.md").exists())
 
     def test_native_codex_discovers_updated_user_roles_and_project_entrance(self):
         self.add_delegation()
@@ -555,7 +555,7 @@ class SetupTest(unittest.TestCase):
         self.assertEqual(self.run_setup("install", "--components", "all", "--entrance", "user").returncode, 0)
         keep = {self.project / ".feather/handoffs/current.md": b"current work",
                 self.project / ".feather/handoffs/history/old.md": b"history",
-                self.project / ".agents/skills/feather-handoff/my-notes.txt": b"my unrelated note"}
+                self.project / ".agents/skills/handoff/my-notes.txt": b"my unrelated note"}
         for path, content in keep.items():
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(content)
@@ -563,7 +563,7 @@ class SetupTest(unittest.TestCase):
         entry.write_bytes(b"my outside instructions\r\n" + entry.read_bytes())
         preview = self.run_setup("remove", "--dry-run")
         self.assertEqual(preview.returncode, 0, preview.stderr)
-        skill = self.project / ".agents/skills/feather-handoff/SKILL.md"
+        skill = self.project / ".agents/skills/handoff/SKILL.md"
         self.assertTrue(skill.exists())
         result = self.run_setup("remove")
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -584,7 +584,7 @@ class SetupTest(unittest.TestCase):
     def test_remove_conflicts_require_explicit_backup_and_failed_removal_rolls_back(self):
         self.add_delegation()
         self.assertEqual(self.run_setup("install", "--components", "all", "--entrance", "project").returncode, 0)
-        skill = self.project / ".agents/skills/feather-handoff/SKILL.md"
+        skill = self.project / ".agents/skills/handoff/SKILL.md"
         changed = skill.read_bytes() + b"\nuser customization\n"
         skill.write_bytes(changed)
         result = self.run_setup("remove", "--components", "all")
@@ -643,32 +643,32 @@ class SetupTest(unittest.TestCase):
         self.add_delegation()
         self.assertEqual(self.run_setup("install", "--components", "all", "--entrance", "project").returncode, 0)
         entry = (self.project / "AGENTS.md").read_bytes()
-        skill = (self.project / ".agents/skills/feather-handoff/SKILL.md").read_bytes()
+        skill = (self.project / ".agents/skills/handoff/SKILL.md").read_bytes()
         result = self.run_setup("migrate", "--components", "all", "--from", "project", "--to", "user", "--dry-run")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertFalse((self.user_home / ".agents/skills/feather-handoff/SKILL.md").exists())
+        self.assertFalse((self.user_home / ".agents/skills/handoff/SKILL.md").exists())
         result = self.run_setup("migrate", "--components", "all", "--from", "project", "--to", "user")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual((self.user_home / ".agents/skills/feather-handoff/SKILL.md").read_bytes(), skill)
-        self.assertFalse((self.project / ".agents/skills/feather-handoff/SKILL.md").exists())
+        self.assertEqual((self.user_home / ".agents/skills/handoff/SKILL.md").read_bytes(), skill)
+        self.assertFalse((self.project / ".agents/skills/handoff/SKILL.md").exists())
         self.assertEqual((self.project / "AGENTS.md").read_bytes(), entry)
         result = self.run_setup("migrate", "--components", "all", "--from", "user", "--to", "project",
                                 "--entrance", "user")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("other projects", json.loads(result.stdout)["impact"])
-        self.assertEqual((self.project / ".agents/skills/feather-handoff/SKILL.md").read_bytes(), skill)
-        self.assertFalse((self.user_home / ".agents/skills/feather-handoff/SKILL.md").exists())
+        self.assertEqual((self.project / ".agents/skills/handoff/SKILL.md").read_bytes(), skill)
+        self.assertFalse((self.user_home / ".agents/skills/handoff/SKILL.md").exists())
         self.assertFalse((self.project / "AGENTS.md").exists())
         self.assertIn(b"feather-setup:handoff:begin", (self.codex_home / "AGENTS.md").read_bytes())
 
     def test_migration_conflicting_source_or_destination_never_changes_either_scope(self):
         self.assertEqual(self.run_setup("install").returncode, 0)
-        skill = self.project / ".agents/skills/feather-handoff/SKILL.md"
+        skill = self.project / ".agents/skills/handoff/SKILL.md"
         original = skill.read_bytes()
         skill.write_bytes(original + b"\ncustom source\n")
         result = self.run_setup("migrate", "--from", "project", "--to", "user")
         self.assertNotEqual(result.returncode, 0)
-        target = self.user_home / ".agents/skills/feather-handoff/SKILL.md"
+        target = self.user_home / ".agents/skills/handoff/SKILL.md"
         self.assertFalse(target.exists())
         skill.write_bytes(original)
         target.parent.mkdir(parents=True)
@@ -699,14 +699,14 @@ class SetupTest(unittest.TestCase):
 
     def test_migration_keeps_source_version_when_a_newer_bundle_is_used(self):
         self.assertEqual(self.run_setup("install").returncode, 0)
-        skill = self.project / ".agents/skills/feather-handoff/SKILL.md"
+        skill = self.project / ".agents/skills/handoff/SKILL.md"
         original = skill.read_bytes()
-        asset = self.bundle / "assets/skills/feather-handoff/SKILL.md"
+        asset = self.bundle / "assets/skills/handoff/SKILL.md"
         asset.write_bytes(original + b"\nThis release is newer.\n")
         self.write_manifest("0.2.0")
         result = self.run_setup("migrate", "--from", "project", "--to", "user")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual((self.user_home / ".agents/skills/feather-handoff/SKILL.md").read_bytes(), original)
+        self.assertEqual((self.user_home / ".agents/skills/handoff/SKILL.md").read_bytes(), original)
         record = json.loads((self.codex_home / "feather-setup/state.json").read_text())
         self.assertEqual(record["components"]["handoff"]["version"], "0.1.0")
 
@@ -734,7 +734,7 @@ class SetupTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             request = capture_tools(CODEX, self.project, self.user_home, self.codex_home)
             registered = registered_tools(request)
-            for role in ["scout", "analyst", "mech-executor", "executor"]:
+            for role in ["scout", "analyst", "mech-executor", "executor", "security-executor"]:
                 self.assertIn(role, json.dumps(registered))
             self.assertIn("feather-setup:delegation:begin", json.dumps(request))
 
@@ -747,7 +747,7 @@ class SetupTest(unittest.TestCase):
         self.assertFalse((self.codex_home / "AGENTS.md").exists())
         result = self.run_setup(None, "--components", "all", input="install\nproject\nuser\nyes\n")
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
-        self.assertTrue((self.project / ".agents/skills/feather-handoff/SKILL.md").exists())
+        self.assertTrue((self.project / ".agents/skills/handoff/SKILL.md").exists())
         entry = (self.codex_home / "AGENTS.md").read_bytes()
         result = self.run_setup("install", "--components", "all", "--scope", "project", "--entrance", "user")
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -756,7 +756,7 @@ class SetupTest(unittest.TestCase):
 
     def test_interactive_update_conflict_keep_replace_and_remove_use_the_same_engine(self):
         self.assertEqual(self.run_setup("install", "--entrance", "project").returncode, 0)
-        target = self.project / ".agents/skills/feather-handoff/SKILL.md"
+        target = self.project / ".agents/skills/handoff/SKILL.md"
         modified = target.read_bytes() + b"\nlocal edit\n"
         target.write_bytes(modified)
         result = self.run_setup(None, input="update\nproject\nkeep\n")
@@ -776,7 +776,7 @@ class SetupTest(unittest.TestCase):
 
     def test_interactive_existing_scope_can_reuse_or_explicitly_migrate(self):
         self.assertEqual(self.run_setup("install", "--scope", "user").returncode, 0)
-        target = self.project / ".agents/skills/feather-handoff/SKILL.md"
+        target = self.project / ".agents/skills/handoff/SKILL.md"
         result = self.run_setup(None, input="install\nproject\nnone\nreuse\nyes\n")
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         self.assertFalse(target.exists())
@@ -852,7 +852,7 @@ class SetupTest(unittest.TestCase):
 
     def test_check_distinguishes_modified_missing_and_unowned_files_without_writes(self):
         self.assertEqual(self.run_setup("install", "--entrance", "user").returncode, 0)
-        target = self.project / ".agents/skills/feather-handoff/SKILL.md"
+        target = self.project / ".agents/skills/handoff/SKILL.md"
         target.write_bytes(target.read_bytes() + b"\nmodified\n")
         before = {p.relative_to(self.directory): p.read_bytes() for p in self.directory.rglob("*") if p.is_file()}
         result = self.run_setup("check")
@@ -887,7 +887,7 @@ class SetupTest(unittest.TestCase):
 
     def test_interactive_replacement_does_not_overwrite_edits_made_after_preview(self):
         self.assertEqual(self.run_setup("install").returncode, 0)
-        target = self.project / ".agents/skills/feather-handoff/SKILL.md"
+        target = self.project / ".agents/skills/handoff/SKILL.md"
         target.write_bytes(target.read_bytes() + b"\nfirst local edit\n")
         executable = os.environ.get("FEATHER_TEST_INSTALLER")
         command = [executable] if executable else [sys.executable, str(ROOT / "scripts/feather_setup.py")]
@@ -930,7 +930,7 @@ class SetupTest(unittest.TestCase):
                 self.write_manifest()
                 path = self.bundle / "bundle.json"
                 manifest = json.loads(path.read_text())
-                source = "assets/skills/feather-handoff/SKILL.md"
+                source = "assets/skills/handoff/SKILL.md"
                 if kind == "checksum":
                     manifest["files"][source] = "0" * 64
                 elif kind == "incomplete":
@@ -938,10 +938,10 @@ class SetupTest(unittest.TestCase):
                 elif kind == "traversal":
                     manifest["components"]["handoff"]["files"][source] = "../escaped.md"
                 else:
-                    alias = "assets/skills/feather-handoff/alias.md"
+                    alias = "assets/skills/handoff/alias.md"
                     (self.bundle / alias).write_bytes((self.bundle / source).read_bytes())
                     manifest["files"][alias] = manifest["files"][source]
-                    manifest["components"]["handoff"]["files"][alias] = ".agents/skills/feather-handoff/skill.md"
+                    manifest["components"]["handoff"]["files"][alias] = ".agents/skills/handoff/skill.md"
                 path.write_text(json.dumps(manifest))
                 result = self.run_setup("install")
                 self.assertNotEqual(result.returncode, 0)
@@ -994,7 +994,7 @@ class SetupTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         self.assertIn("Feather: install", result.stdout)
         self.assertTrue((self.project / ".codex/agents/analyst.toml").exists())
-        self.assertTrue((self.project / ".agents/skills/feather-handoff/SKILL.md").exists())
+        self.assertTrue((self.project / ".agents/skills/handoff/SKILL.md").exists())
         self.assertFalse((self.project / "AGENTS.md").exists())
 
     def test_editor_save_during_entrance_planning_is_preserved(self):
@@ -1004,13 +1004,13 @@ class SetupTest(unittest.TestCase):
         result = self.run_setup("install", "--entrance", "project", edit_after_read=(str(entry), concurrent))
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(entry.read_bytes(), b"original user instructions\n" + concurrent)
-        self.assertFalse((self.project / ".agents/skills/feather-handoff/SKILL.md").exists())
+        self.assertFalse((self.project / ".agents/skills/handoff/SKILL.md").exists())
 
     def test_editor_save_after_component_validation_is_not_force_replaced(self):
         self.assertEqual(self.run_setup("install").returncode, 0)
-        skill = self.project / ".agents/skills/feather-handoff/SKILL.md"
+        skill = self.project / ".agents/skills/handoff/SKILL.md"
         original = skill.read_bytes()
-        asset = self.bundle / "assets/skills/feather-handoff/SKILL.md"
+        asset = self.bundle / "assets/skills/handoff/SKILL.md"
         asset.write_bytes(original + b"\nnew release\n")
         self.write_manifest("0.2.0")
         concurrent = b"\neditor added this local rule\n"
@@ -1021,14 +1021,14 @@ class SetupTest(unittest.TestCase):
     def test_same_skill_name_in_another_directory_is_not_duplicated(self):
         alias = self.project / ".agents/skills/group/renamed-handoff/SKILL.md"
         alias.parent.mkdir(parents=True)
-        for name in ["feather-handoff", '"feather\\u002dhandoff"', ">-\n  feather-handoff"]:
+        for name in ["handoff", '"feather\\u002dhandoff"', ">-\n  handoff"]:
             with self.subTest(name=name):
                 content = f"---\nname: {name}\ndescription: Existing handoff skill\n---\nMy own skill.\n".encode()
                 alias.write_bytes(content)
                 result = self.run_setup("install")
                 self.assertNotEqual(result.returncode, 0)
                 self.assertEqual(alias.read_bytes(), content)
-                self.assertFalse((self.project / ".agents/skills/feather-handoff/SKILL.md").exists())
+                self.assertFalse((self.project / ".agents/skills/handoff/SKILL.md").exists())
         self.codex_home.mkdir(parents=True)
         (self.project / ".feather-root").touch()
         (self.codex_home / "config.toml").write_text('project_root_markers = [".feather-root"]\n')
@@ -1041,7 +1041,7 @@ class SetupTest(unittest.TestCase):
             self.assertEqual(self.run_setup("install", "--components", "all", "--scope", source).returncode, 0)
             root = self.user_home if source == "user" else self.project
             for component, relative, content in [
-                ("handoff", ".agents/skills/renamed/SKILL.md", b"---\nname: feather-handoff\ndescription: Alias\n---\n"),
+                ("handoff", ".agents/skills/renamed/SKILL.md", b"---\nname: handoff\ndescription: Alias\n---\n"),
                 ("delegation", ".codex/agents/renamed.toml", b'name = "scout"\ndescription = "Alias"\ndeveloper_instructions = "Read"\n'),
             ]:
                 with self.subTest(source=source, component=component):
@@ -1062,10 +1062,10 @@ class SetupTest(unittest.TestCase):
             if not profile:
                 self.skipTest("Windows Codex uses the OS profile, not HOME overrides; run the explicit temporary-profile-skill probe")
             self.user_home = Path(profile).resolve(strict=True)
-            target = self.user_home / ".agents/skills/feather-handoff/SKILL.md"
+            target = self.user_home / ".agents/skills/handoff/SKILL.md"
             if target.parent.exists():
                 self.skipTest("Existing profile skill is preserved; use a clean Windows test profile")
-            expected = (ROOT / "skills/feather-handoff/SKILL.md").read_bytes()
+            expected = (ROOT / "skills/handoff/SKILL.md").read_bytes()
 
             def cleanup_profile_skill():
                 if target.exists():
@@ -1082,12 +1082,12 @@ class SetupTest(unittest.TestCase):
         request = capture_tools(CODEX, self.project, self.user_home, self.codex_home)
         registered = registered_tools(request)
         tools = json.dumps(registered, ensure_ascii=False)
-        for role in ["scout", "analyst", "mech-executor", "executor"]:
+        for role in ["scout", "analyst", "mech-executor", "executor", "security-executor"]:
             self.assertTrue(role in tools, f"User-scope role was not registered: {role}")
         rendered = render_messages(request.get("input", []))
         self.assertIn("<!-- feather-setup:handoff:begin -->", rendered)
-        self.assertEqual(skill_paths(rendered, "feather-handoff"),
-                         [(self.user_home / ".agents/skills/feather-handoff/SKILL.md").resolve()])
+        self.assertEqual(skill_paths(rendered, "handoff"),
+                         [(self.user_home / ".agents/skills/handoff/SKILL.md").resolve()])
         (self.project / ".feather-root").touch()
         (self.codex_home / "config.toml").write_text(
             'project_root_markers = [".feather-root"]\n'
@@ -1098,8 +1098,8 @@ class SetupTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             request = capture_tools(CODEX, self.project, self.user_home, self.codex_home)
             rendered = render_messages(request.get("input", []))
-            self.assertEqual(skill_paths(rendered, "feather-handoff"),
-                             [(expected_root / ".agents/skills/feather-handoff/SKILL.md").resolve()])
+            self.assertEqual(skill_paths(rendered, "handoff"),
+                             [(expected_root / ".agents/skills/handoff/SKILL.md").resolve()])
             self.assertIn("feather-setup:handoff:begin", rendered)
 
 

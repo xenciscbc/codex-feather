@@ -9,7 +9,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TOOL = ROOT / "skills/feather-handoff/scripts/handoff.py"
+TOOL = ROOT / "skills/handoff/scripts/handoff.py"
 
 
 class HandoffHistoryTest(unittest.TestCase):

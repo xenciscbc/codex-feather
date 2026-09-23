@@ -1,4 +1,4 @@
 interface:
   display_name: "Feather Setup"
   short_description: "Configure and maintain Feather roles and guidance"
-  default_prompt: "Use $feather-setup to check and configure Feather for this project."
+  default_prompt: "Use $setup to check and configure Feather for this project."

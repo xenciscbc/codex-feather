@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | Windows | `python -B -m unittest discover -s tests -q` | 145 項，通過，2 項略過 |
 | Ubuntu / WSL，Python 3.12.3，x86_64 | 新增五個 `tests.test_handoff_*` 測試模組 | 31 項，通過，3 項 Windows 專用分享限制測試略過 |
-| Windows | `mypy --check-untyped-defs skills/feather-handoff/scripts scripts/setup_installer` | 25 個來源檔案通過 |
+| Windows | `mypy --check-untyped-defs skills/handoff/scripts scripts/setup_installer` | 25 個來源檔案通過 |
 
 測試由公開 CLI 在隔離目錄實際執行，涵蓋建立、即時清單、舊格式與不完整讀取、人工內容保留、過時版本拒絕、完成後自動歸檔、相同身份重試／正文衝突、歷史篩選、指定清除及封存。完整 payload 經公開建置、安裝、更新、執行與移除；移除後原交接資料保留。Python 缺少、過舊、可用與 Windows launcher 參數以隔離 PATH 程序驗證，不修改使用者環境。
 

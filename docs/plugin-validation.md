@@ -12,9 +12,9 @@
 | `python -m unittest discover -s tests -p test_setup.py` | 59 項完成，57 通過、2 略過 |
 | `python -m unittest discover -s tests -p test_trial.py` | 19 項通過 |
 | Plugin creator 的 `validate_plugin.py .` | 通過 |
-| Skill creator 的 `quick_validate.py skills/feather-setup` | 通過 |
+| Skill creator 的 `quick_validate.py skills/setup` | 通過 |
 | Plugin creator 的 `read_marketplace_name.py --marketplace-path .agents/plugins/marketplace.json` | `codex-feather` |
-| `python -m mypy --cache-dir dist/plugin-mypy-cache scripts/setup_installer scripts/feather_setup.py scripts/build_setup.py skills/feather-setup/scripts/setup.py` | 18 個來源檔案通過 |
+| `python -m mypy --cache-dir dist/plugin-mypy-cache scripts/setup_installer scripts/feather_setup.py scripts/build_setup.py skills/setup/scripts/setup.py` | 18 個來源檔案通過 |
 | `git diff --check` | 通過 |
 
 安裝器測試透過 `FEATHER_TEST_CODEX` 指定上述原生執行檔；略過項目為獨立二進位的無 Python 路徑驗證，以及 Windows 使用者 skill 的另行 profile 測試。mypy 使用既有 `.scratch/feather-improvements/dev-deps`，沒有安裝新套件。mypy 提醒既有未標註函式的內文未檢查，不能將結果視為完整 strict 型別驗證。
@@ -54,7 +54,7 @@ Review 發現兩層 parser 對縮寫的解讀不同：`remove --comp handoff` �
 | `python -m unittest tests.test_model -v` | 11 項通過 |
 | `python -m unittest discover -s tests -p test_setup.py` | 59 項完成，57 通過、2 略過 |
 | `python -m unittest discover -s tests -p test_plugin_setup.py` | 12 項通過 |
-| mypy：既有來源範圍加 `skills/feather-model/scripts/model.py` | 20 個來源檔案通過；既有未標註函式仍非 strict 檢查 |
+| mypy：既有來源範圍加 `skills/model/scripts/model.py` | 20 個來源檔案通過；既有未標註函式仍非 strict 檢查 |
 | Plugin validator、兩個 setup/model skill validator | 通過 |
 | `build_setup.py --prepare-only` 與 payload SHA-256 | 通過，包含新增 runtime 的來源摘要 |
 

@@ -10,7 +10,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TOOL = ROOT / "skills/feather-handoff/scripts/handoff.py"
+TOOL = ROOT / "skills/handoff/scripts/handoff.py"
 TITLE = "config-audit"
 COMPLETED = "2026-09-11T10:00:00+08:00"
 BODY = (f"更新：{COMPLETED}\r\n狀態：完成\r\n目標：核對設定\r\n"

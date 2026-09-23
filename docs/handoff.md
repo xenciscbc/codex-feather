@@ -1,10 +1,10 @@
 # Feather 交接
 
-`feather-handoff` 讓同一專案的新 session 從精簡 Markdown 接續工作。使用 [feather-setup](setup.md) 可選擇專案或使用者範圍，並獨立決定是否加入入口指引。也可手動部署 `skills/feather-handoff/` 整個目錄；安裝或更新後在新 session 使用。
+`handoff` 讓同一專案的新 session 從精簡 Markdown 接續工作。使用 [setup](setup.md) 可選擇專案或使用者範圍，並獨立決定是否加入入口指引。也可手動部署 `skills/handoff/` 整個目錄；安裝或更新後在新 session 使用。
 
 例如：
 
-> 用 feather-handoff 交接 config-audit。已核對 port，還沒跑測試，下一步核對 readiness。
+> 用 handoff 交接 config-audit。已核對 port，還沒跑測試，下一步核對 readiness。
 
 第一次明確要求才建立 `.feather/handoffs/<工作名稱>.md`。同一項工作更新同一份檔案，在重要進展或受阻時記下目標、具體進度與驗證結果、下一步及必要限制。不需要保留整段對話。
 
@@ -16,35 +16,35 @@
 
 交接工具需要 Python 3.11+，只用標準函式庫，隨整個 skill 一起部署；安裝器執行檔本身仍不需 Python。缺少合適 Python 時，Agent 先詢問是否需要協助安裝，取得同意才處理；期間可唯讀查閱，但不繞過工具寫入。
 
-> 用 feather-handoff 列出目前的交接項目與進度。
+> 用 handoff 列出目前的交接項目與進度。
 
-工具即時掃描原交接檔並回傳簡短清單，不建立索引。完成但原交接尚在的工作仍顯示「完成待歸檔」；共同歷史與封存另行查詢。清單不完整時會列出問題檔案，不能據此宣稱沒有待辦或選定唯一工作。詳細命令與回傳格式見 skill 的 [工具說明](../skills/feather-handoff/references/tool.md)。
+工具即時掃描原交接檔並回傳簡短清單，不建立索引。完成但原交接尚在的工作仍顯示「完成待歸檔」；共同歷史與封存另行查詢。清單不完整時會列出問題檔案，不能據此宣稱沒有待辦或選定唯一工作。詳細命令與回傳格式見 skill 的 [工具說明](../skills/handoff/references/tool.md)。
 
 若根目錄辨識失敗，工具會回報目前讀取路徑與原因，保留可讀結果，並在任何交接寫入前停止。Agent 可依已知工作區確認根目錄後明確指定；只有路徑仍有歧義時才詢問，避免在子目錄另建交接。這不會改變 Git 信任設定。
 
 ## 在新 session 接續
 
-> 用 feather-handoff 讀取 config-audit 的交接，上次做到哪？
+> 用 handoff 讀取 config-audit 的交接，上次做到哪？
 
 這會只回報狀態。若要繼續執行，說：
 
-> 用 feather-handoff 接續上次工作。
+> 用 handoff 接續上次工作。
 
 只有一項未完成工作時直接選取；多項且無法辨識時會列出名稱詢問。接續前先核對相關檔案，修正過時資訊，再執行下一步。一般查閱不改寫檔案，接續也不會自動讀共同歷史。
 
 交接可選擇保存相關來源的檔案基準。例如「保存登入功能交接，記錄 `src/auth.py` 和 `config/auth.json` 的基準」。工具只讀取選定檔案，將內容摘要與 Git 狀態保存在同一份交接；一般進度更新保留舊基準。
 
-接續含基準的交接時，Agent 會先比對來源，區分未變、已變、新增、缺失與無法確認，再判斷需要核對哪些結論。相同 commit 不會掩蓋未提交修改；基準符合也不代表測試通過。舊交接沒有基準仍可接續，沿用人工核對。唯讀查閱不會額外執行比對或下一步。命令、讀取上限與部分失敗處理見 [來源基準說明](../skills/feather-handoff/references/snapshots.md)。
+接續含基準的交接時，Agent 會先比對來源，區分未變、已變、新增、缺失與無法確認，再判斷需要核對哪些結論。相同 commit 不會掩蓋未提交修改；基準符合也不代表測試通過。舊交接沒有基準仍可接續，沿用人工核對。唯讀查閱不會額外執行比對或下一步。命令、讀取上限與部分失敗處理見 [來源基準說明](../skills/handoff/references/snapshots.md)。
 
 接續時會先簡短交代「目前進度、保存後的變動、下一步、阻礙」，然後繼續已授權工作，不增加一次確認流程。若有測試證據可對應基準，沿用 `驗證：` 記錄命令、工作目錄、時間、結果，以及基準擷取時間、選定檔案範圍與測試後比對結果；具體步驟見來源基準說明。來源變動或無法確認時，舊測試保留為歷史證據，更新基準不會自動讓舊測試適用於新內容。
 
 ## 從 Claude memory 查找交接
 
-> 用 feather-handoff 從 Claude memory 目錄 `C:/Users/me/.claude/projects/my-project/memory` 找出交接記錄，只讀取並摘要。
+> 用 handoff 從 Claude memory 目錄 `C:/Users/me/.claude/projects/my-project/memory` 找出交接記錄，只讀取並摘要。
 
 也可以指定專案，讓 Agent 定位來源：
 
-> 用 feather-handoff 從專案 `D:/work/my-service` 的 Claude memory 找出交接記錄。
+> 用 handoff 從專案 `D:/work/my-service` 的 Claude memory 找出交接記錄。
 
 定位會核對實際設定、自訂記憶位置與 Git repository／worktree 關係；非 Git 專案也可使用。有效設定有正常優先序時直接採用，不把低優先序的舊值當成另一個搜尋來源。若仍有多個合理候選，先列出路徑與依據讓你選；找不到時回報檢查範圍，你也能直接提供 memory 目錄。目錄名稱編碼與設定行為會隨 Claude 版本核對，不只靠字元替換猜路徑。
 
@@ -54,7 +54,7 @@
 
 若同時提供明確 memory 目錄與專案根目錄，或由專案定位取得 memory，會讀取 memory 明確連結、且解析後實際位於該專案內的 Markdown 交接檔。例如：
 
-> 用 feather-handoff 從 memory 目錄 `D:/work/my-service-memory` 找交接，專案範圍是 `D:/work/my-service`；同專案交接連結也納入摘要。
+> 用 handoff 從 memory 目錄 `D:/work/my-service-memory` 找交接，專案範圍是 `D:/work/my-service`；同專案交接連結也納入摘要。
 
 相對路徑會連同符號連結或 reparse point 的父目錄一起解析後才判斷範圍。同一目標被重複引用只讀取並回報一次；交接檔連回 memory 時不會循環，也不會繼續跟隨交接檔裡的其他連結或遍歷專案。跨專案檔案與網頁只列出來源。失效、不可讀或內容並非交接的連結會分別說明，不妨礙回報其他可讀項目；讀取失敗造成範圍未完整時會明確標示。
 
@@ -68,9 +68,9 @@
 
 每項工作由一個寫入者維護，所有工作的共同歷史也共用一個寫入者。主 Agent 會依序處理歸檔、清除及歷史封存；已知其他 session 正在寫歷史時，先保留完成版交接，待對方完成再歸檔。這是協調規則，沒有跨 session 鎖定保證；多個 session 同時工作時需另外協調共同歷史的寫入者。
 
-> 用 feather-handoff 查閱 config-audit 的歷史。
+> 用 handoff 查閱 config-audit 的歷史。
 
-> 用 feather-handoff 只清除 config-audit 在指定完成時間的那筆歷史，其餘保留。
+> 用 handoff 只清除 config-audit 在指定完成時間的那筆歷史，其餘保留。
 
 查閱只回報；清除必須由你明確要求，範圍不清楚時會先詢問。清除全部共同歷史也不會移除未完成工作的交接檔。已清楚指定範圍時直接處理，不再重複確認。
 
@@ -78,15 +78,15 @@
 
 可以按工作名稱、完成日期區間或關鍵字搜尋，結果會附上工作、完成時間與所在檔案。日期區間依指定時區解讀，未指定時會說明採用的使用者時區。只搜尋、閱讀符合條件的紀錄；無法完整檢查時會說明限制。
 
-> 用 feather-handoff 搜尋共同歷史，找 2026-09-01 至 2026-09-08（Asia/Taipei）完成且提到 readiness 的紀錄。
+> 用 handoff 搜尋共同歷史，找 2026-09-01 至 2026-09-08（Asia/Taipei）完成且提到 readiness 的紀錄。
 
 資料累積後，可明確要求把選定歷史搬到 `.feather/handoffs/archive/<批次>.md`，保留完整內容、順序與完成時間。先存妥並核對目的檔，才移除共同歷史中相同的條目；失敗時保留可恢復副本，重試使用先前回報的目的檔。既有不同內容不會被覆寫。
 
 封存前（含重試）會檢查是否仍有相同工作名稱與完成時間的完成交接檔。若有，會保留全部檔案並延後封存，回報需先重試歸檔收尾，避免之後重複追加歷史；同名但不同完成時間不影響封存。
 
-> 用 feather-handoff 將共同歷史中 2026 年 8 月完成的紀錄封存到 archive/2026-08.md，日期以 Asia/Taipei 為準，其餘保留。
+> 用 handoff 將共同歷史中 2026 年 8 月完成的紀錄封存到 archive/2026-08.md，日期以 Asia/Taipei 為準，其餘保留。
 
-> 用 feather-handoff 搜尋所有歷史，包含 archive/ 的封存，找提到 readiness 的紀錄。
+> 用 handoff 搜尋所有歷史，包含 archive/ 的封存，找提到 readiness 的紀錄。
 
 歷史操作預設只處理 `history.md`；明確指定才包含封存檔。清除共同歷史不影響封存，封存檔也不會被當成待接續工作。封存不會因檔案大小或時間而自動執行。
 
@@ -95,14 +95,14 @@
 沿用現有隔離入口，素材、候選 skill 與驗收結果各自保存。以下只準備素材與檢查，不送出模型任務：
 
 ```powershell
-python scripts/trial.py prepare .scratch/feather-handoff/runs/my-create --scenario handoff-create
-python scripts/trial.py check .scratch/feather-handoff/runs/my-create
+python scripts/trial.py prepare .scratch/handoff/runs/my-create --scenario handoff-create
+python scripts/trial.py check .scratch/handoff/runs/my-create
 ```
 
 候選 skill 複製到隔離 home，fixture 的專案指令維持原樣。执行該目錄的 `prompt.txt` 後，以相同入口驗證：
 
 ```powershell
-python scripts/trial.py verify .scratch/feather-handoff/runs/my-create
+python scripts/trial.py verify .scratch/handoff/runs/my-create
 python -m unittest discover -s tests -p test_handoff_trial.py
 ```
 

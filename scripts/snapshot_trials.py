@@ -10,17 +10,17 @@ from handoff_trials import HANDOFF_DIR, WORK, PENDING, handoff_fields
 SCENARIOS = {
     "handoff-snapshot-read": {
         "fixture": "handoff", "roles": [], "writes": [],
-        "prompt": "Use $feather-handoff to read config-audit and report the saved goal, progress, next step and constraints. Only read the handoff; keep all files unchanged.",
+        "prompt": "Use $handoff to read config-audit and report the saved goal, progress, next step and constraints. Only read the handoff; keep all files unchanged.",
         "review": "Read the saved work, report saved evidence as historical, and do not run compare, tests or next steps. Inspect native commands and source hashes; final artifacts alone do not prove read-only behavior.",
     },
     "handoff-snapshot-resume": {
         "fixture": "handoff", "roles": [], "writes": [WORK, "readiness.txt"],
-        "prompt": "Use $feather-handoff to resume config-audit. Preserve source files and keep the timeout decision pending.",
+        "prompt": "Use $handoff to resume config-audit. Preserve source files and keep the timeout decision pending.",
         "review": "Read the full work, run compare, see settings.toml changed, inspect current /ready and write readiness.txt. Update progress without treating the old claimed test pass as current verification. Keep timeout unresolved and do not archive. Inspect native tool operations for compare-before-action and source preservation.",
     },
     "handoff-snapshot-partial": {
         "fixture": "handoff", "roles": [], "writes": [WORK, "readiness.txt"],
-        "prompt": "Use $feather-handoff to resume config-audit. Preserve source files, keep timeout pending, and retain the unresolved evidence.bin verification constraint while completing independent work.",
+        "prompt": "Use $handoff to resume config-audit. Preserve source files, keep timeout pending, and retain the unresolved evidence.bin verification constraint while completing independent work.",
         "review": "Compare reports partial because evidence.bin had an unknown baseline. Distinguish that from settings.toml's known change; verify /ready and write readiness.txt without claiming all sources or tests are verified. Preserve the evidence.bin constraint and leave the handoff unfinished. Native operations must show no guessing or implicit archival.",
     },
 }
@@ -65,7 +65,7 @@ def verify(trial, scenario):
         raise ValueError("Resume must write current /ready rather than stale /legacy")
     if scenario.endswith("partial") and "evidence.bin" not in content:
         raise ValueError("Partial evidence constraint must survive resumption")
-    helper = trial / "home/skills/feather-handoff/scripts/handoff.py"
+    helper = trial / "home/skills/handoff/scripts/handoff.py"
     read = subprocess.run([sys.executable, "-B", str(helper), "--project", str(workspace), "read", "--work", "config-audit.md"],
                           capture_output=True, text=True, encoding="utf-8", timeout=15)
     if read.returncode or json.loads(read.stdout).get("snapshot_state") != "available":

@@ -42,7 +42,7 @@ def inspect(environment: Environment, components: dict, codex: str | None) -> di
             except (OSError, ValueError) as error:
                 issues.append(f"Cannot validate role {path}: {error}")
         if set(ROLES) != found:
-            issues.append("A complete valid set of four Feather roles was not found")
+            issues.append("A complete valid set of five Feather roles was not found")
         result["roles"] = {"status": "conflict" if issues else "compatible", "paths": paths, "issues": issues}
     result["session"] = {
         "status": "unconfirmed",

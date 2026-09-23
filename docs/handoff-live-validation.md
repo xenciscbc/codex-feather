@@ -6,7 +6,7 @@
 
 - 發行包：`feather-setup-0.1.0-windows-x64.zip`，SHA-256 `7221e4ef891f1d8ff95d2fe83319e5a906f96d16aeb3253067fb4f64c13e8a24`。
 - 核對校驗碼後重新解壓，直接執行內附 `feather-setup.exe install --components handoff --scope project --entrance project`；未指定替代素材包。
-- skill 部署至測試專案 `.agents/skills/feather-handoff/SKILL.md`；入口追加到原有 `AGENTS.md`。新 session 實際讀取此安裝路徑的 skill 並操作，不以載入探測請求取代真實工作。
+- skill 部署至測試專案 `.agents/skills/handoff/SKILL.md`；入口追加到原有 `AGENTS.md`。新 session 實際讀取此安裝路徑的 skill 並操作，不以載入探測請求取代真實工作。
 - 原生 Codex 版本 `0.153.4`。沿用 app 的模型與 reasoning 預設，本次沒有驗證模型綁定。測試專案不是 Git repository，未將 Git 忽略行為列為本輪驗收。
 - 新素材 `round6_handoff/service.json`：name `handoff-demo`、port `8427`、readiness `/ready-v6`、timeout_seconds `19`。
 

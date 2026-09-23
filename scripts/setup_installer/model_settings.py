@@ -4,11 +4,13 @@ import re
 from .bundle import ROLES
 
 
-def values(content: str) -> dict[str, dict[str, str]]:
+def values(content: str, allow_legacy: bool = False) -> dict[str, dict[str, str]]:
     result = {}
     for role in ROLES:
-        pattern = rf"(?m)^\| {re.escape(role)} \| ([^|\r\n]+) \| ([^|\r\n]+) \|$"
+        pattern = rf"(?m)^\| {re.escape(role)} \| ([^|\r\n]+) \| ([^|\r\n]+) \|\r?$"
         matches = list(re.finditer(pattern, content))
+        if allow_legacy and role == "security-executor" and not matches:
+            continue
         if len(matches) != 1:
             raise ValueError(f"Managed delegation guidance has no unique {role} model row")
         result[role] = {"model": matches[0].group(1).strip(), "reasoning": matches[0].group(2).strip()}
@@ -29,6 +31,6 @@ def render(content: str, overrides: dict) -> str:
                 raise ValueError(f"Invalid saved reasoning effort for {role}")
     for role in ROLES:
         chosen = {**baseline[role], **overrides.get(role, {})}
-        pattern = rf"(?m)^\| {re.escape(role)} \| [^|\r\n]+ \| [^|\r\n]+ \|$"
-        content = re.sub(pattern, f"| {role} | {chosen['model']} | {chosen['reasoning']} |", content)
+        pattern = rf"(?m)^\| {re.escape(role)} \| [^|\r\n]+ \| [^|\r\n]+ \|(\r?)$"
+        content = re.sub(pattern, lambda match: f"| {role} | {chosen['model']} | {chosen['reasoning']} |" + match[1], content)
     return content

@@ -60,7 +60,7 @@ class PluginSetupTest(unittest.TestCase):
         self.addCleanup(cleanup)
         self.plugin = self.directory / "plugin cache/codex-feather"
         self.plugin.mkdir(parents=True)
-        for name in (".codex-plugin", "templates", "scripts", "skills/feather-setup", "skills/feather-handoff", "skills/feather-model", "docs"):
+        for name in (".codex-plugin", "templates", "scripts", "skills/setup", "skills/handoff", "skills/model", "skills/auto-on", "skills/auto-off", "docs"):
             source = ROOT / name
             target = self.plugin / name
             shutil.copytree(source, target, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
@@ -86,7 +86,7 @@ class PluginSetupTest(unittest.TestCase):
                 for path in root.rglob("*") if path.is_file()}
 
     def run_setup(self, action=None, *extra, project=True):
-        command = [sys.executable, str(self.plugin / "skills/feather-setup/scripts/setup.py")]
+        command = [sys.executable, str(self.plugin / "skills/setup/scripts/setup.py")]
         if action is not None:
             command.append(action)
         if project:
@@ -151,13 +151,13 @@ class PluginSetupTest(unittest.TestCase):
         source_before = self.plugin_files()
         installed = self.assert_success(self.run_setup("install", "--entrance", "project"))
         self.assertEqual(installed["components"]["delegation"]["status"], "installed")
-        for role in ("scout", "analyst", "mech-executor", "executor"):
+        for role in ("scout", "analyst", "mech-executor", "executor", "security-executor"):
             self.assertEqual((self.project / f".codex/agents/{role}.toml").read_bytes(),
                              (self.plugin / f"templates/{role}.toml").read_bytes())
         agents = (self.project / "AGENTS.md").read_text(encoding="utf-8")
         self.assertIn(self.existing_agents, agents)
         self.assertIn("feather-setup:delegation:begin", agents)
-        self.assertFalse((self.project / ".agents/skills/feather-handoff").exists())
+        self.assertFalse((self.project / ".agents/skills/handoff").exists())
         self.assertEqual((self.project / ".feather/handoffs/work.md").read_text(), "My handoff data\n")
         checked = self.assert_success(self.run_setup("check"))
         self.assertEqual(checked["components"]["delegation"]["status"], "installed")
@@ -166,11 +166,11 @@ class PluginSetupTest(unittest.TestCase):
         self.assertEqual(removed["components"]["delegation"]["status"], "removed")
         self.assertEqual((self.project / "AGENTS.md").read_text(encoding="utf-8"), self.existing_agents)
         self.assertEqual((self.project / ".feather/handoffs/work.md").read_text(), "My handoff data\n")
-        self.assertFalse((self.project / ".agents/skills/feather-handoff").exists())
+        self.assertFalse((self.project / ".agents/skills/handoff").exists())
         self.assertEqual(self.plugin_files(), source_before)
 
     def test_existing_standalone_handoff_is_untouched_by_default(self):
-        existing = self.project / ".agents/skills/feather-handoff/SKILL.md"
+        existing = self.project / ".agents/skills/handoff/SKILL.md"
         existing.parent.mkdir(parents=True)
         existing.write_text("My standalone handoff\n", encoding="utf-8")
         self.assert_success(self.run_setup("install"))
@@ -181,12 +181,12 @@ class PluginSetupTest(unittest.TestCase):
 
     def test_user_scope_install_and_project_to_user_migration(self):
         self.assert_success(self.run_setup("install", "--scope", "user", "--entrance", "user"))
-        for role in ("scout", "analyst", "mech-executor", "executor"):
+        for role in ("scout", "analyst", "mech-executor", "executor", "security-executor"):
             self.assertEqual((self.codex_home / f"agents/{role}.toml").read_bytes(),
                              (self.plugin / f"templates/{role}.toml").read_bytes())
         self.assertIn("feather-setup:delegation:begin", (self.codex_home / "AGENTS.md").read_text(encoding="utf-8"))
         self.assertEqual((self.project / "AGENTS.md").read_text(encoding="utf-8"), self.existing_agents)
-        self.assertFalse((self.user_home / ".agents/skills/feather-handoff").exists())
+        self.assertFalse((self.user_home / ".agents/skills/handoff").exists())
         self.assert_success(self.run_setup("remove", "--scope", "user"))
         self.assert_success(self.run_setup("install", "--entrance", "project"))
         self.assert_success(self.run_setup("migrate", "--from", "project", "--to", "user"))
@@ -194,7 +194,7 @@ class PluginSetupTest(unittest.TestCase):
         self.assertTrue((self.codex_home / "agents/scout.toml").exists())
         self.assertIn("feather-setup:delegation:begin", (self.project / "AGENTS.md").read_text(encoding="utf-8"))
         self.assertEqual((self.project / ".feather/handoffs/work.md").read_text(), "My handoff data\n")
-        self.assertFalse((self.user_home / ".agents/skills/feather-handoff").exists())
+        self.assertFalse((self.user_home / ".agents/skills/handoff").exists())
 
     def test_explicit_handoff_remove_cleans_legacy_installation_only(self):
         bundle = self.directory / "legacy bundle"
@@ -209,7 +209,7 @@ class PluginSetupTest(unittest.TestCase):
         legacy = subprocess.run(command, cwd=self.other_cwd, capture_output=True, text=True,
                                 encoding="utf-8", timeout=45)
         self.assertEqual(legacy.returncode, 0, legacy.stderr + legacy.stdout)
-        skill = self.project / ".agents/skills/feather-handoff/SKILL.md"
+        skill = self.project / ".agents/skills/handoff/SKILL.md"
         self.assertTrue(skill.exists())
         self.assert_success(self.run_setup("remove", "--components", "handoff"))
         self.assertFalse(skill.exists())
@@ -283,7 +283,7 @@ class PluginSetupTest(unittest.TestCase):
     def test_missing_runtime_dependency_stops_before_target_writes(self):
         before = self.target_files()
         result = subprocess.run(
-            [sys.executable, "-S", str(self.plugin / "skills/feather-setup/scripts/setup.py"),
+            [sys.executable, "-S", str(self.plugin / "skills/setup/scripts/setup.py"),
              "install", "--project", str(self.project), "--user-home", str(self.user_home),
              "--codex-home", str(self.codex_home)],
             cwd=self.other_cwd, capture_output=True, text=True, encoding="utf-8", timeout=45)

@@ -30,7 +30,7 @@ def main() -> int:
     if args.bundle is not None or args.interactive:
         parser.error("The plugin supplies its own bundle; choose an explicit operation without --bundle or --interactive.")
     if args.action not in {"check", "remove"} and args.components != ["delegation"]:
-        parser.error("The plugin supplies feather-handoff. Only delegation can be installed, updated or migrated here. "
+        parser.error("The plugin supplies handoff. Only delegation can be installed, updated or migrated here. "
                      "Use handoff check/remove solely for an existing standalone installation.")
     try:
         import yaml  # type: ignore[import-untyped]  # Required by installer skill discovery.

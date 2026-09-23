@@ -23,7 +23,7 @@ TDD 經過情境不存在、缺少回覆、漏報工作、捏造或錯置來源�
 
 ## 02：專案來源定位（2026-09-10）
 
-定位依據與官方文件連結集中在 [定位參考](../skills/feather-handoff/references/claude-memory-location.md)。核對現行官方頁面後，使用 project/local 設定受 workspace trust 影響的規則；沒有沿用舊搜尋摘要中「僅 user/managed 可設定」的限制。普通設定優先序與真正的信任狀態歧義分開處理。
+定位依據與官方文件連結集中在 [定位參考](../skills/handoff/references/claude-memory-location.md)。核對現行官方頁面後，使用 project/local 設定受 workspace trust 影響的規則；沒有沿用舊搜尋摘要中「僅 user/managed 可設定」的限制。普通設定優先序與真正的信任狀態歧義分開處理。
 
 新增定位素材涵蓋自訂位置、預設位置、Git worktree／子目錄、非 Git、已確認的啟動命名、信任狀態歧義、有效設定指向缺失目錄及不合法相對位置。累計 11 項 memory 核對器測試通過，包含錯誤來源、設定與 Git metadata 修改的拒絕案例；mypy 通過。非 Git 素材另拒絕位於既有 repository 內的準備位置。這些是素材與核對器測試，不等於所有情境皆有原生實跑。
 

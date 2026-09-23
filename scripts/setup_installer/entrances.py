@@ -8,20 +8,24 @@ from .transaction import Plan
 from .conflicts import ConflictError
 
 
-def instruction(bundle: Bundle, component: str, overrides: dict | None = None) -> str:
+def instruction(bundle: Bundle, component: str, overrides: dict | None = None,
+                review_mode: str | None = None) -> str:
     if component == "delegation":
         body = bundle.payload["assets/templates/AGENTS.md"].decode("utf-8-sig").strip()
         if overrides:
             from .model_settings import render
             body = render(body, overrides)
-        guard = ("Apply this delegation guidance only when scout, analyst, mech-executor and executor "
+        if review_mode is not None:
+            from .review_settings import render_mode
+            body = render_mode(body, review_mode)
+        guard = ("Apply this delegation guidance only when scout, analyst, mech-executor, executor and security-executor "
                  "are available in the current environment. If unavailable, report the missing capability "
                  "and keep the work with the main Agent. This declaration does not install or enable roles.")
     else:
-        guard = ("Use this capability only when feather-handoff is listed among the skills available in the "
+        guard = ("Use this capability only when handoff or legacy feather-handoff is listed among the skills available in the "
                  "current environment. This declaration does not install the skill in other projects.")
         body = ("When the user requests a handoff or continuation of recorded work, read and follow the "
-                "available feather-handoff skill. Preserve its handoff-file and history rules. "
+                "available handoff skill (or feather-handoff when only that legacy skill is available). Preserve its handoff-file and history rules. "
                 "This entry grants no additional authorization to edit, delegate, or delete data.")
     return f"{guard}\n\n{body}"
 
@@ -73,10 +77,10 @@ def model_entrance(owner: Environment, record: dict, plan: Plan):
     if not link:
         return None
     if link["scope"] != owner.scope or link["root"] != str(owner.project if owner.scope == "project" else owner.codex_home):
-        raise ValueError("Delegation entrance scope differs from the owning installation. Move it to the owner scope with feather-setup before changing permanent defaults")
+        raise ValueError("Delegation entrance scope differs from the owning installation. Move it to the owner scope with setup before changing permanent defaults")
     observed = inspect(owner, "delegation", link)
     if observed["status"] != "installed":
-        raise ValueError(f"Managed delegation entrance is {observed['status']}: {observed['path']}; resolve it with feather-setup")
+        raise ValueError(f"Managed delegation entrance is {observed['status']}: {observed['path']}; resolve it with setup")
     root, ledger_path, ledger = load(plan, owner, link)
     entry = ledger["blocks"]["delegation"]
     if entry["owners"] != [str(owner.state_path) + "#delegation"]:
@@ -91,9 +95,21 @@ def set_model_defaults(plan: Plan, owner: Environment, record: dict, overrides: 
     entrance = model_entrance(owner, record, plan)
     if entrance is None:
         raise ValueError("No managed delegation entrance is active")
+    _replace_content(plan, entrance, render(entrance[2]["content"], overrides))
+
+
+def set_review_mode(plan: Plan, owner: Environment, record: dict, mode: str) -> None:
+    from .review_settings import render_mode
+    entrance = model_entrance(owner, record, plan)
+    if entrance is None:
+        raise ValueError("No managed delegation entrance is active")
+    _replace_content(plan, entrance, render_mode(entrance[2]["content"], mode))
+
+
+def _replace_content(plan: Plan, entrance: tuple, content: str) -> None:
     ledger_path, ledger, entry, target = entrance
     before_block = entry["content"].encode()
-    after_block = render(entry["content"], overrides).encode()
+    after_block = content.encode()
     file_content = plan.read(target)
     if file_content is None or file_content.count(before_block) != 1:
         raise ValueError(f"Managed entrance changed: {target}")
@@ -108,7 +124,7 @@ def attach(plan: Plan, environment: Environment, bundle: Bundle, component: str,
         raise ValueError("Existing entrance is in another scope; remove it explicitly before changing scope")
     result = manage(plan, environment, bundle, component, link, replace=replace,
                     overrides=record.get("model_overrides"),
-                    allow_model_update=not record.get("reused"))
+                    allow_model_update=not record.get("reused"), review_mode=record.get("review_mode"))
     record["entrance"] = link
     return result
 
@@ -116,7 +132,7 @@ def attach(plan: Plan, environment: Environment, bundle: Bundle, component: str,
 def manage(plan: Plan, environment: Environment, bundle: Bundle, component: str,
            link: dict[str, str], remove: bool = False, replace: bool = False,
            transfer_to: Environment | None = None, overrides: dict | None = None,
-           allow_model_update: bool = False) -> dict:
+           allow_model_update: bool = False, review_mode: str | None = None) -> dict:
     root, ledger_path, ledger = load(plan, environment, link)
     scope = link["scope"]
     old = ledger["blocks"].get(component)
@@ -133,7 +149,7 @@ def manage(plan: Plan, environment: Environment, bundle: Bundle, component: str,
     current = before or b""
     begin = f"<!-- feather-setup:{component}:begin -->".encode()
     end = f"<!-- feather-setup:{component}:end -->".encode()
-    block = b"\n\n" + begin + b"\n" + instruction(bundle, component, overrides).encode() + b"\n" + end + b"\n"
+    block = b"\n\n" + begin + b"\n" + instruction(bundle, component, overrides, review_mode).encode() + b"\n" + end + b"\n"
     if old:
         prior = old["content"].encode()
         # Existing role owners can upgrade shared guidance; joining or reused owners
@@ -141,7 +157,10 @@ def manage(plan: Plan, environment: Environment, bundle: Bundle, component: str,
         if (component == "delegation" and not remove and transfer_to is None
                 and (owner not in old["owners"] or (len(old["owners"]) > 1 and not allow_model_update))):
             from .model_settings import values
-            if values(prior.decode()) != values(block.decode()):
+            from .review_settings import mode_value
+            if mode_value(prior.decode()) != mode_value(block.decode()):
+                raise ValueError(f"Delegation entrance cannot be shared or rewritten with different review modes: {target}")
+            if values(prior.decode(), allow_legacy=True) != values(block.decode(), allow_legacy=True):
                 raise ValueError(f"Delegation entrance cannot be shared or rewritten with different model defaults: {target}")
         if current.count(begin) != 1 or current.count(end) != 1 or current.count(prior) != 1:
             if current.count(begin) != 1 or current.count(end) != 1 or not replace:

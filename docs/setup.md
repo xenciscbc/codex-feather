@@ -1,8 +1,8 @@
 # Feather 獨立安裝器
 
-原生 plugin 使用者請先看 [plugin 設定流程](plugin.md)：plugin 提供兩個 skills，`feather-setup` 使用相同安裝器管理外部角色與分工入口。以下是獨立離線包的完整操作說明。
+原生 plugin 使用者請先看 [plugin 設定流程](plugin.md)：plugin 提供五個 skills，其中 `setup` 使用相同安裝器管理外部角色與分工入口。以下是獨立離線包的完整操作說明。
 
-`feather-setup` 以完整離線包安裝、檢查、更新、移除或遷移 Feather。可選 `delegation`（四角色）及 `handoff`（交接 skill），`all` 表示整套。安裝器不安裝 Codex、不登入帳號，也不在安裝途中下載元件。
+獨立 `feather-setup` 以完整離線包安裝、檢查、更新、移除或遷移 Feather。可選 `delegation`（五角色）及 `handoff`（交接 skill），`all` 表示整套。安裝器不安裝 Codex、不登入帳號，也不在安裝途中下載元件。
 
 ## 取得與啟動
 
@@ -11,7 +11,7 @@
 - Windows x64：`feather-setup-0.1.0-windows-x64.zip`
 - Linux x64：`feather-setup-0.1.0-linux-x64.tar.gz`
 
-核對同批發行的 `.sha256` 後完整解壓；保留執行檔、`_internal/`、`assets/` 與 `bundle.json` 在同一資料夾。這些是可直接執行的包，不要求另裝 Python。發行包仍需由維護者上傳至發行位置；最新本機重建包在 `dist/2026-09-09/`，版本沿用 0.1.0，`dist/` 根目錄保留較早包。不能把原始碼 ZIP 當作二進位發行包。
+核對同批發行的 `.sha256` 後完整解壓；保留執行檔、`_internal/`、`assets/` 與 `bundle.json` 在同一資料夾。這些是可直接執行的包，不要求另裝 Python。發行包仍需由維護者上傳至發行位置；最新本機重建包在 `dist/2026-09-09/`，版本沿用 0.1.0，`dist/` 根目錄保留較早包。該舊包只有四角色與舊版設定功能；五角色與審查模式需使用含新版素材的安裝器。不能把原始碼 ZIP 當作二進位發行包。
 
 Windows 直接執行 `feather-setup.exe`；Linux 在解壓資料夾執行 `./feather-setup`。不帶操作名稱時進入互動引導，依序選操作、元件、專案路徑、元件範圍與適用的入口選項，檢查預覽後輸入 `yes` 才套用。預設確認是 `no`；取消、輸入結束或只預覽均不套用。
 
@@ -51,8 +51,8 @@ Windows 直接執行 `feather-setup.exe`；Linux 在解壓資料夾執行 `./fea
 
 | 內容 | 專案範圍 | 使用者範圍 |
 | --- | --- | --- |
-| 四角色 | `<project>/.codex/agents/` | `<codex-home>/agents/` |
-| feather-handoff | `<project>/.agents/skills/feather-handoff/` | `<user-home>/.agents/skills/feather-handoff/` |
+| 五角色 | `<project>/.codex/agents/` | `<codex-home>/agents/` |
+| handoff | `<project>/.agents/skills/handoff/` | `<user-home>/.agents/skills/handoff/` |
 | 入口指引 | `<project>/AGENTS.override.md` 或 `AGENTS.md` | `<codex-home>/AGENTS.override.md` 或 `AGENTS.md` |
 | 元件安裝紀錄 | `<project>/.feather/setup/state.json` | `<codex-home>/feather-setup/state.json` |
 | 入口所有權紀錄 | `<project>/.feather/setup/entrances.json` | `<codex-home>/feather-setup/entrances.json` |
@@ -67,7 +67,7 @@ Windows 原生 Codex 使用 OS 使用者 profile 發現使用者 skills；覆寫
 
 ## 沿用與遷移
 
-安裝會檢查目前專案、可見 repo 祖先及使用者範圍。發現完整的既有同名能力時沿用，摘要列出實際來源，不建立另一份。部份角色集合、異名檔案宣告相同角色、其他 skill 資料夾宣告 `feather-handoff`，或多個可見同名集合會回報衝突。沿用表示找到了既有檔案，並不取得其所有權，也不證明 Codex 已載入。更新應指定真正擁有該元件的安裝範圍。
+安裝會檢查目前專案、可見 repo 祖先及使用者範圍。新版 handoff 安裝在 `skills/handoff/`；舊版 `skills/feather-handoff/` 仍可辨識，遷移與清理依原所有權紀錄處理。發現完整的既有同名能力時沿用，摘要列出實際來源，不建立另一份。部份角色集合、異名檔案宣告相同角色，或多個可見同名集合會回報衝突。沿用表示找到了既有檔案，並不取得其所有權，也不證明 Codex 已載入。更新應指定真正擁有該元件的安裝範圍。
 
 明確遷移範例：
 
@@ -83,9 +83,11 @@ Windows 原生 Codex 使用 OS 使用者 profile 發現使用者 skills；覆寫
 
 遷移只接受已受管理且未手改的來源，目的同名内容也會阻止遷移。請先處理自訂內容與衝突；遷移不接受 `--on-conflict replace`。若使用者安裝曾管理另一個專案的入口，操作需以該原始專案路徑執行，避免暗中改寫其他專案。
 
+Plugin 的自動計畫審查模式由 `$auto-on` 和 `$auto-off` 切換；session 不寫檔，project 或 user 才保存到既有安裝的狀態及受管理入口。預設 off；工具指令及兩次自動審查上限見 [審查模式](../skills/setup/references/auto-review.md)。舊版安裝器不具備此欄位的保留能力，更新前應使用支援的版本。
+
 ## 更新、衝突與移除
 
-角色模型與推理強度由 plugin 的 `feather-model` skill 引導修改：先列出現況，再選擇要改的欄位，最後決定 session 或永久。永久值記錄在角色擁有者的安裝狀態與受管理入口；此版安裝器在更新及遷移時保留設定。請使用含此功能的新版工具，舊版安裝器沒有保留這些設定的能力。模型設定不寫入角色 TOML，也不修改主 Agent 的模型。完整流程見 [README](../README.zh-TW.md#修改角色模型)。
+角色模型與推理強度由 plugin 的 `model` skill 引導修改：先列出現況，再選擇要改的欄位，最後決定 session 或永久。永久值記錄在角色擁有者的安裝狀態與受管理入口；此版安裝器在更新及遷移時保留設定。請使用含此功能的新版工具，舊版安裝器沒有保留這些設定的能力。模型設定不寫入角色 TOML，也不修改主 Agent 的模型。完整流程見 [README](../README.zh-TW.md#修改角色模型)。
 
 下載並解壓新版完整包，再從新版包執行：
 

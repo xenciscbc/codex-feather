@@ -8,7 +8,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TOOL = ROOT / "skills/feather-handoff/scripts/handoff.py"
+TOOL = ROOT / "skills/handoff/scripts/handoff.py"
 RECORD = ("# config-audit\n更新：2026-09-11T10:00:00+08:00\n狀態：進行中\n\n"
           "目標：核對設定\n進度：port=7319；readiness 待確認。\n下一步：核對 readiness\n"
           "注意：timeout 等待使用者決定。\n\n## 詳細紀錄\n人工證據保留。\n")

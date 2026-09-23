@@ -1,4 +1,4 @@
 interface:
   display_name: "Feather Model"
   short_description: "Choose Feather role models and reasoning effort"
-  default_prompt: "Use $feather-model to show my current role settings and guide model or reasoning changes."
+  default_prompt: "Use $model to show my current role settings and guide model or reasoning changes."

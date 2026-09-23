@@ -58,13 +58,13 @@ class TrialTest(unittest.TestCase):
             self.assertTrue((trial / "workspace/AGENTS.md").is_file())
             self.assertFalse((trial / "home/auth.json").exists())
 
-    def test_all_scenarios_have_four_native_roles(self):
+    def test_all_scenarios_have_five_native_roles(self):
         for scenario in ["analyst-code", "analyst-doc", "analyst-report", "mech", "executor", "direct-small", "direct-global", "generic", "coordination", "return-contract", "bounded-reclaim"]:
             with self.subTest(scenario=scenario), tempfile.TemporaryDirectory() as temporary:
                 trial = Path(temporary) / "trial"
                 result = self.run_trial("prepare", trial, "--scenario", scenario)
                 self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertEqual(len(list((trial / "home/agents").glob("*.toml"))), 4)
+                self.assertEqual(len(list((trial / "home/agents").glob("*.toml"))), 5)
                 self.assertEqual(self.run_trial("check", trial).returncode, 0)
 
     def test_mechanical_result_and_scope_are_checked(self):

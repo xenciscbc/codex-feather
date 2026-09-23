@@ -1,0 +1,4 @@
+interface:
+  display_name: "Feather Auto On"
+  short_description: "Enable automatic review for material plans"
+  default_prompt: "Use $auto-on to enable risk-triggered plan review for this session."

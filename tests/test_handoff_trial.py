@@ -25,7 +25,7 @@ class HandoffTrialTest(unittest.TestCase):
             trial = Path(temporary) / "trial"
             result = self.run_trial("prepare", trial, "--scenario", "handoff-create")
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertTrue((trial / "home/skills/feather-handoff/SKILL.md").is_file())
+            self.assertTrue((trial / "home/skills/handoff/SKILL.md").is_file())
             self.assertEqual(self.run_trial("check", trial).returncode, 0)
             self.assertNotEqual(self.run_trial("verify", trial).returncode, 0)
             workspace = trial / "workspace"

@@ -35,7 +35,7 @@ class SnapshotTrialsTest(unittest.TestCase):
                 self.assertNotEqual(self.run_trial("verify", trial).returncode, 0)
                 (trial / "answer.md").write_text("Current /ready; timeout unresolved; evidence.bin remains unknown.", encoding="utf-8")
                 workspace = trial / "workspace"
-                helper = trial / "home/skills/feather-handoff/scripts/handoff.py"
+                helper = trial / "home/skills/handoff/scripts/handoff.py"
                 compare = subprocess.run([sys.executable, "-B", str(helper), "--project", str(workspace), "compare", "--work", "config-audit.md"],
                                          capture_output=True, text=True, encoding="utf-8", timeout=15)
                 compared = json.loads(compare.stdout)

@@ -13,14 +13,16 @@ Handoffs live in Markdown files inside the project. The tool uses the Python sta
 
 ### Native Codex plugin
 
-The repository packages `feather-handoff`, `feather-setup` and `feather-model` as a native plugin. Install the published version through the Git marketplace:
+The repository packages `handoff`, `setup`, `model`, `auto-on` and `auto-off` as a native plugin. Install the published version through the Git marketplace:
 
 ```sh
 codex plugin marketplace add xenciscbc/codex-feather
 codex plugin add codex-feather@codex-feather
 ```
 
-Start a new session and ask **“Use feather-setup to configure Feather for this project”** or specify user scope. Setup previews and applies custom roles and agent guidance using the existing installer; installing the plugin alone does not write them. Source setup requires Python 3.11+ and PyYAML (`requirements-setup.txt`).
+Codex may display plugin-qualified skill names such as `codex-feather:handoff`; their short names are `handoff`, `setup`, `model`, `auto-on` and `auto-off`. Native child-role names have no such prefix.
+
+Start a new session and ask **“Use setup to configure Feather for this project”** or specify user scope. Setup previews and applies five custom roles and agent guidance using the existing installer; installing the plugin alone does not write them. Source setup requires Python 3.11+ and PyYAML (`requirements-setup.txt`).
 
 After refreshing the plugin, ask setup to update the external configuration. Before uninstalling the plugin, ask setup to remove those managed files. Existing standalone handoff skills require an explicit transition; setup does not install a duplicate. See [plugin setup and lifecycle](docs/plugin.md). Tags through `v1.0.1` do not contain this plugin packaging.
 
@@ -38,24 +40,33 @@ User scope provides a shared installation for your local user; project scope ins
 
 ## Delegation
 
-| Role | Responsibility |
-| --- | --- |
-| scout | Find locations and extract content without writing files; return facts with references. |
-| analyst | Analyze logic, contradictions, and impacts while preserving sources; write a separate analysis artifact only when assigned. |
-| mech-executor | Apply repetitive edits from a complete specification. |
-| executor | Implement changes that require local design or engineering judgment. |
+| Role | Responsibility | Native permissions | Default model / reasoning |
+| --- | --- | --- | --- |
+| scout | Locate and extract cited facts | read-only; no file output | gpt-6-luna / low |
+| analyst | Causal, impact, security analysis and plan review | workspace-write; protect sources, only explicitly assigned artifacts | gpt-6-sol / high |
+| mech-executor | Fully specified repetitive edits | workspace-write, assigned scope only | gpt-6-luna / medium |
+| executor | Implementation needing local engineering judgment | workspace-write, assigned scope only | gpt-6-sol / medium |
+| security-executor | Authorized security implementation, allowed and abuse/denial checks | workspace-write, assigned scope only | gpt-6-sol / high |
 
 Only the main agent delegates; children do not delegate further. Each child reports results, changes, validation, and blockers for the main agent to review. Writes to shared resources are serialized. If the same blocker recurs, the main agent takes the task back and preserves existing results instead of retrying it unchanged indefinitely.
 
-You can specify a child's model or reasoning effort; unspecified settings use role defaults. Your main model and concurrency preferences remain unchanged. Unavailable capabilities or model combinations are reported. See the [delegation rules](templates/AGENTS.md) for defaults and the full contract.
+Model and reasoning resolve independently: applicable task setting, session override, saved setting, then packaged default. Defaults are scout `gpt-6-luna/low`, analyst `gpt-6-sol/high`, mech-executor `gpt-6-luna/medium`, executor `gpt-6-sol/medium`, and security-executor `gpt-6-sol/high`. Your main model and concurrency preferences remain unchanged. Native dispatch passes both fields; configuration and child self-report do not prove actual model use. Unavailable combinations are reported. See the [delegation rules](templates/AGENTS.md) for defaults and the full contract.
 
 ### Change role models
 
-Ask **“Use feather-model to show my current role settings”**. It lists each role's model, reasoning effort and owning installation, then asks what to change. After showing the proposed values, it asks whether to use them **for this session only** or **permanently**. Choices already included in your request are reused.
+Ask **“Use model to show my current role settings”**. It lists each role's model, reasoning effort and owning installation, then asks what to change. After showing the proposed values, it asks whether to use them **for this session only** or **permanently**. Choices already included in your request are reused.
 
 Session changes apply to future child dispatches in that conversation and write no files. Permanent changes follow the roles' actual installation: project scope for project-installed roles, user scope for shared roles. A project that reuses user-installed roles therefore changes the shared installation. The preview shows the affected paths before applying; ambiguous ownership or conflicting guidance stops the write.
 
-Permanent choices survive supported setup updates and scope migrations. Unspecified fields remain unchanged, and running children keep their existing settings. Open a fresh session to load saved guidance. `feather-model` is delivered by the plugin and requires Python 3.11+ and PyYAML; it can also manage roles previously deployed by the standalone installer. Plugin installation alone does not deploy those roles.
+Permanent choices survive supported setup updates and scope migrations. Unspecified fields remain unchanged, and running children keep their existing settings. Open a fresh session to load saved guidance. `model` is delivered by the plugin and requires Python 3.11+ and PyYAML; it can also manage roles previously deployed by the standalone installer. Plugin installation alone does not deploy those roles.
+
+### Automatic plan review
+
+The packaged mode is **off**. `$auto-on` and `$auto-off` with no argument or `session` change only this conversation and write no files. Add `project` or `user` to save a default in an existing owned installation. The persistent workflow previews the scope and paths, applies with the returned plan ID, then reads back the saved mode. User scope can affect several projects. Supported updates preserve saved modes. See [review mode guidance](skills/setup/references/auto-review.md).
+
+Auto mode requires a fresh analyst review before implementation for material security-boundary changes, data migrations, irreversible operations or complex cross-module work. A stable logical plan gets at most two automatic review calls total, including failures. READY lets already authorized work proceed; unresolved REVISE after the second call stops dependent implementation until an explicit further review request. Independent authorized work can continue. A toggle never resets the count. Explicit plan review applies in off mode too. These are agent instructions, not runtime hooks.
+
+Project policy lives in `<project>/AGENTS.md` (or existing `AGENTS.override.md`) and `<project>/.feather/setup/state.json`. User policy lives in `<CODEX_HOME>/AGENTS.md` (or override) and `<CODEX_HOME>/feather-setup/state.json`; CODEX_HOME defaults to `~/.codex`. Entrance ownership lives in `entrances.json` beside the state file. A verified setup and entrance must already exist in that scope; toggles never install roles implicitly. Explicit task/session preferences override saved values. Mode changes preserve blockers and counts. Existing handoffs retain the logical plan ID, call count, verdicts and blockers across model changes, renaming and new sessions.
 
 ## Usage
 
@@ -63,18 +74,21 @@ After installation, tell Codex what you want to do:
 
 | Task | Example request |
 | --- | --- |
+| Choose review role and model | Use analyst with gpt-6-luna and high reasoning to review this authorization plan. |
+| Choose security implementation | Use security-executor with gpt-6-sol to fix the confirmed authorization issue and verify denial cases. |
 | Delegate work | Delegate a review of the login feature, identify problems, and fix them. |
-| Inspect role settings | Use feather-model to show the current models and reasoning effort. |
-| Change a session setting | Use feather-model to set scout reasoning to medium for this session only. |
-| Save a role setting | Use feather-model to permanently set executor to gpt-6-sol with high reasoning. |
-| Save progress | Use feather-handoff to save a handoff for the current work. |
-| List work | Use feather-handoff to list the current handoffs. |
-| Resume work | Use feather-handoff to resume the login feature work. |
-| Read progress only | Use feather-handoff to read the login feature handoff. |
+| Inspect role settings | Use model to show the current models and reasoning effort. |
+| Change a session setting | Use model to set scout reasoning to medium for this session only. |
+| Save a role setting | Use model to permanently set executor to gpt-6-sol with high reasoning. |
+| Toggle plan review | Use $auto-on for this session; use $auto-off project to save off in this project. |
+| Save progress | Use handoff to save a handoff for the current work. |
+| List work | Use handoff to list the current handoffs. |
+| Resume work | Use handoff to resume the login feature work. |
+| Read progress only | Use handoff to read the login feature handoff. |
 | Save a source baseline | Save the login feature handoff with a baseline for `src/auth.py` and `config/auth.json`. |
-| Search completed work | Use feather-handoff to search completed history for records mentioning login. |
-| Seal selected history | Use feather-handoff to seal the selected completed records, preserving their full contents. |
-| Find Claude handoffs | Use feather-handoff to find handoff records in Claude memory at `D:/work/my-project-memory`; only read and summarize. |
+| Search completed work | Use handoff to search completed history for records mentioning login. |
+| Seal selected history | Use handoff to seal the selected completed records, preserving their full contents. |
+| Find Claude handoffs | Use handoff to find handoff records in Claude memory at `D:/work/my-project-memory`; only read and summarize. |
 
 ## Handoffs and resuming
 
@@ -98,7 +112,7 @@ Some detailed guides are currently available in Traditional Chinese.
 
 - [Installation, updates, and removal](docs/setup.md)
 - [Handoffs, history search, and sealing](docs/handoff.md)
-- [Source baselines and verification records](skills/feather-handoff/references/snapshots.md)
+- [Source baselines and verification records](skills/handoff/references/snapshots.md)
 - [Delegation rules](templates/AGENTS.md)
 - [Development and validation](docs/development.md)
 - [Handoff tool validation](docs/handoff-tool-validation.md)
