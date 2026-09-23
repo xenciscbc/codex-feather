@@ -131,6 +131,65 @@ class ModelTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Native role binding"):
             run("show", self.env, [])
 
+    def test_shared_entrance_upgrade_preserves_owners_and_blocks_reused_downgrade(self):
+        key = "assets/templates/AGENTS.md"
+        latest = self.bundle.payload[key]
+        legacy = latest.replace(b"gpt-6-", b"gpt-5.6-")
+        self.bundle.payload[key] = legacy
+        self.install("user", "user")
+        self.install("project", "user")
+        target = self.codex_home / "AGENTS.md"
+        target.write_bytes(b"Keep personal guidance.\n" + target.read_bytes())
+        ledger_path = self.codex_home / "feather-setup/entrances.json"
+        owners = json.loads(ledger_path.read_text())["blocks"]["delegation"]["owners"]
+        before = {path: path.read_bytes() for path in self.base.rglob("*") if path.is_file()}
+        self.bundle.payload[key] = latest
+        owner = Environment(self.project, self.user_home, self.codex_home, "user")
+        preview = execute("update", owner, self.bundle, ["delegation"], None, dry_run=True)
+        self.assertEqual(before, {path: path.read_bytes() for path in self.base.rglob("*") if path.is_file()})
+        result = execute("update", owner, self.bundle, ["delegation"], None,
+                         expected_plan=preview["_plan_id"])
+        self.assertIn("backup", result)
+        self.assertEqual(values(target.read_text()), values(latest.decode()))
+        self.assertTrue(target.read_bytes().startswith(b"Keep personal guidance.\n"))
+        self.assertEqual(json.loads(ledger_path.read_text())["blocks"]["delegation"]["owners"], owners)
+        self.bundle.payload[key] = legacy
+        upgraded = {path: path.read_bytes() for path in self.base.rglob("*") if path.is_file()}
+        with self.assertRaisesRegex(ValueError, "cannot be shared"):
+            self.install("project", "user")
+        self.assertEqual(upgraded, {path: path.read_bytes() for path in self.base.rglob("*") if path.is_file()})
+        with self.assertRaisesRegex(ValueError, "shared owners"):
+            run("preview", self.env, ["scout.reasoning=high"])
+
+    def test_shared_entrance_upgrade_still_preserves_manual_edits(self):
+        key = "assets/templates/AGENTS.md"
+        latest = self.bundle.payload[key]
+        self.bundle.payload[key] = latest.replace(b"gpt-6-", b"gpt-5.6-")
+        self.install("user", "user")
+        self.install("project", "user")
+        target = self.codex_home / "AGENTS.md"
+        target.write_bytes(target.read_bytes().replace(b"gpt-5.6-luna", b"custom-model"))
+        before = {path: path.read_bytes() for path in self.base.rglob("*") if path.is_file()}
+        self.bundle.payload[key] = latest
+        from setup_installer.conflicts import ConflictError
+        with self.assertRaises(ConflictError):
+            execute("update", Environment(self.project, self.user_home, self.codex_home, "user"),
+                    self.bundle, ["delegation"], None)
+        self.assertEqual(before, {path: path.read_bytes() for path in self.base.rglob("*") if path.is_file()})
+
+    def test_model_edit_preserves_unrelated_guidance_and_rejects_modified_block(self):
+        self.install()
+        target = self.project / "AGENTS.md"
+        target.write_bytes(b"Personal prefix\n" + target.read_bytes() + b"Personal suffix\n")
+        self.apply("scout.reasoning=medium")
+        self.assertTrue(target.read_bytes().startswith(b"Personal prefix\n"))
+        self.assertTrue(target.read_bytes().endswith(b"Personal suffix\n"))
+        target.write_bytes(target.read_bytes().replace(b"gpt-6-luna", b"custom-model"))
+        before = {path: path.read_bytes() for path in self.base.rglob("*") if path.is_file()}
+        with self.assertRaisesRegex(ValueError, "entrance is conflict"):
+            run("preview", self.env, ["scout.reasoning=high"])
+        self.assertEqual(before, {path: path.read_bytes() for path in self.base.rglob("*") if path.is_file()})
+
     def test_missing_entrance_and_unmanaged_roles_are_rejected(self):
         self.install(entrance="none")
         shown = run("show", self.env, [])

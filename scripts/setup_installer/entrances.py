@@ -68,19 +68,55 @@ def inspect(environment: Environment, component: str, link: dict[str, str]) -> d
             "load_condition": "Codex document limits, deeper instructions and project trust still apply"}
 
 
+def model_entrance(owner: Environment, record: dict, plan: Plan):
+    link = record.get("entrance")
+    if not link:
+        return None
+    if link["scope"] != owner.scope or link["root"] != str(owner.project if owner.scope == "project" else owner.codex_home):
+        raise ValueError("Delegation entrance scope differs from the owning installation. Move it to the owner scope with feather-setup before changing permanent defaults")
+    observed = inspect(owner, "delegation", link)
+    if observed["status"] != "installed":
+        raise ValueError(f"Managed delegation entrance is {observed['status']}: {observed['path']}; resolve it with feather-setup")
+    root, ledger_path, ledger = load(plan, owner, link)
+    entry = ledger["blocks"]["delegation"]
+    if entry["owners"] != [str(owner.state_path) + "#delegation"]:
+        raise ValueError(f"Delegation entrance has shared owners: {ledger_path}; separate its ownership before changing defaults")
+    target = root / entry["file"]
+    return ledger_path, ledger, entry, target
+
+
+def set_model_defaults(plan: Plan, owner: Environment, record: dict, overrides: dict) -> None:
+    """Plan a model-table edit with the same entrance ownership and content checks."""
+    from .model_settings import render
+    entrance = model_entrance(owner, record, plan)
+    if entrance is None:
+        raise ValueError("No managed delegation entrance is active")
+    ledger_path, ledger, entry, target = entrance
+    before_block = entry["content"].encode()
+    after_block = render(entry["content"], overrides).encode()
+    file_content = plan.read(target)
+    if file_content is None or file_content.count(before_block) != 1:
+        raise ValueError(f"Managed entrance changed: {target}")
+    plan.add(target, file_content.replace(before_block, after_block, 1))
+    entry["content"] = after_block.decode()
+    plan.add(ledger_path, (json.dumps(ledger, indent=2) + "\n").encode())
+
+
 def attach(plan: Plan, environment: Environment, bundle: Bundle, component: str, record: dict,
            link: dict[str, str], replace: bool = False) -> dict:
     if record.get("entrance") and record["entrance"] != link:
         raise ValueError("Existing entrance is in another scope; remove it explicitly before changing scope")
     result = manage(plan, environment, bundle, component, link, replace=replace,
-                    overrides=record.get("model_overrides"))
+                    overrides=record.get("model_overrides"),
+                    allow_model_update=not record.get("reused"))
     record["entrance"] = link
     return result
 
 
 def manage(plan: Plan, environment: Environment, bundle: Bundle, component: str,
            link: dict[str, str], remove: bool = False, replace: bool = False,
-           transfer_to: Environment | None = None, overrides: dict | None = None) -> dict:
+           transfer_to: Environment | None = None, overrides: dict | None = None,
+           allow_model_update: bool = False) -> dict:
     root, ledger_path, ledger = load(plan, environment, link)
     scope = link["scope"]
     old = ledger["blocks"].get(component)
@@ -100,7 +136,10 @@ def manage(plan: Plan, environment: Environment, bundle: Bundle, component: str,
     block = b"\n\n" + begin + b"\n" + instruction(bundle, component, overrides).encode() + b"\n" + end + b"\n"
     if old:
         prior = old["content"].encode()
-        if component == "delegation" and not remove and transfer_to is None and (len(old["owners"]) > 1 or owner not in old["owners"]):
+        # Existing role owners can upgrade shared guidance; joining or reused owners
+        # cannot replace its model table with defaults from a different bundle.
+        if (component == "delegation" and not remove and transfer_to is None
+                and (owner not in old["owners"] or (len(old["owners"]) > 1 and not allow_model_update))):
             from .model_settings import values
             if values(prior.decode()) != values(block.decode()):
                 raise ValueError(f"Delegation entrance cannot be shared or rewritten with different model defaults: {target}")

@@ -31,7 +31,7 @@ try:
     from setup_installer.discovery import reuse_candidate  # noqa: E402
     from setup_installer.environment import Environment  # noqa: E402
     from setup_installer.installer import read_state  # noqa: E402
-    from setup_installer.model_settings import values, render  # noqa: E402
+    from setup_installer.model_settings import values  # noqa: E402
     from setup_installer.transaction import Plan, TransactionError  # noqa: E402
     from setup_installer import entrances  # noqa: E402
 except ImportError as error:
@@ -70,23 +70,6 @@ def _owner(environment: Environment, plan: Plan):
     if len(owned) != 1:
         raise ValueError("Expected one visible owned delegation installation; resolve duplicate scopes or install delegation first")
     return owned[0]
-
-
-def _entrance(owner: Environment, record: dict, plan: Plan):
-    link = record.get("entrance")
-    if not link:
-        return None
-    if link["scope"] != owner.scope or link["root"] != str(owner.project if owner.scope == "project" else owner.codex_home):
-        raise ValueError("Delegation entrance scope differs from the owning installation. Move it to the owner scope with feather-setup before changing permanent defaults")
-    observed = entrances.inspect(owner, "delegation", link)
-    if observed["status"] != "installed":
-        raise ValueError(f"Managed delegation entrance is {observed['status']}: {observed['path']}; resolve it with feather-setup")
-    root, ledger_path, ledger = entrances.load(plan, owner, link)
-    entry = ledger["blocks"]["delegation"]
-    if entry["owners"] != [str(owner.state_path) + "#delegation"]:
-        raise ValueError(f"Delegation entrance has shared owners: {ledger_path}; separate its ownership before changing defaults")
-    target = root / entry["file"]
-    return ledger_path, ledger, entry, target
 
 
 def _check_other_guidance(environment: Environment, own_target: Path | None, plan: Plan) -> None:
@@ -131,7 +114,7 @@ def run(action: str, environment: Environment, raw: list[str], expected_plan: st
     assignments = _assignments(raw)
     plan = Plan()
     owner, state, record = _owner(environment, plan)
-    entrance = _entrance(owner, record, plan)
+    entrance = entrances.model_entrance(owner, record, plan)
     _check_other_guidance(environment, entrance[3] if entrance else None, plan)
     current: dict[str, dict[str, str]]
     if entrance:
@@ -158,14 +141,7 @@ def run(action: str, environment: Environment, raw: list[str], expected_plan: st
     new_overrides = copy.deepcopy(record.get("model_overrides", {}))
     for role, fields in assignments.items():
         new_overrides.setdefault(role, {}).update(fields)
-    before_block = entry["content"].encode()
-    after_block = render(entry["content"], new_overrides).encode()
-    file_content = plan.read(target)
-    if file_content is None or file_content.count(before_block) != 1:
-        raise ValueError(f"Managed entrance changed: {target}")
-    plan.add(target, file_content.replace(before_block, after_block, 1))
-    entry["content"] = after_block.decode()
-    plan.add(ledger_path, (json.dumps(ledger, indent=2) + "\n").encode())
+    entrances.set_model_defaults(plan, owner, record, new_overrides)
     record["model_overrides"] = new_overrides
     plan.add(owner.state_path, (json.dumps(state, indent=2) + "\n").encode())
     report.update(before=current, after=updated, changes=plan.summary(), plan_id=plan.fingerprint())
