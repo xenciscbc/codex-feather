@@ -28,7 +28,8 @@ def payload(destination: Path) -> None:
                                             for source in files if source.startswith("assets/templates/") and source.endswith(".toml")}}}
     sources = [ROOT / "scripts/feather_setup.py", ROOT / "scripts/build_setup.py", *(ROOT / "scripts/setup_installer").glob("*.py")]
     try:
-        git = ["git", "-c", f"safe.directory={ROOT.as_posix()}"]
+        # Metadata collection also runs inside plugin caches during check/dry-run.
+        git = ["git", "--no-optional-locks", "-c", f"safe.directory={ROOT.as_posix()}"]
         revision = subprocess.run([*git, "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.strip()
         dirty = bool(subprocess.run([*git, "status", "--porcelain", "--untracked-files=no"], cwd=ROOT,
                                     capture_output=True, text=True, check=True).stdout.strip())

@@ -85,6 +85,8 @@ Windows 原生 Codex 使用 OS 使用者 profile 發現使用者 skills；覆寫
 
 ## 更新、衝突與移除
 
+角色模型與推理強度由 plugin 的 `feather-model` skill 引導修改：先列出現況，再選擇要改的欄位，最後決定 session 或永久。永久值記錄在角色擁有者的安裝狀態與受管理入口；此版安裝器在更新及遷移時保留設定。請使用含此功能的新版工具，舊版安裝器沒有保留這些設定的能力。模型設定不寫入角色 TOML，也不修改主 Agent 的模型。完整流程見 [README](../README.zh-TW.md#修改角色模型)。
+
 下載並解壓新版完整包，再從新版包執行：
 
 ```powershell

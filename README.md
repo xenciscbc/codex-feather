@@ -13,7 +13,7 @@ Handoffs live in Markdown files inside the project. The tool uses the Python sta
 
 ### Native Codex plugin
 
-The repository now packages `feather-handoff` and `feather-setup` as a native plugin. Once this version is published, install it through the Git marketplace:
+The repository packages `feather-handoff`, `feather-setup` and `feather-model` as a native plugin. Install the published version through the Git marketplace:
 
 ```sh
 codex plugin marketplace add xenciscbc/codex-feather
@@ -49,6 +49,14 @@ Only the main agent delegates; children do not delegate further. Each child repo
 
 You can specify a child's model or reasoning effort; unspecified settings use role defaults. Your main model and concurrency preferences remain unchanged. Unavailable capabilities or model combinations are reported. See the [delegation rules](templates/AGENTS.md) for defaults and the full contract.
 
+### Change role models
+
+Ask **“Use feather-model to show my current role settings”**. It lists each role's model, reasoning effort and owning installation, then asks what to change. After showing the proposed values, it asks whether to use them **for this session only** or **permanently**. Choices already included in your request are reused.
+
+Session changes apply to future child dispatches in that conversation and write no files. Permanent changes follow the roles' actual installation: project scope for project-installed roles, user scope for shared roles. A project that reuses user-installed roles therefore changes the shared installation. The preview shows the affected paths before applying; ambiguous ownership or conflicting guidance stops the write.
+
+Permanent choices survive supported setup updates and scope migrations. Unspecified fields remain unchanged, and running children keep their existing settings. Open a fresh session to load saved guidance. `feather-model` is delivered by the plugin and requires Python 3.11+ and PyYAML; it can also manage roles previously deployed by the standalone installer. Plugin installation alone does not deploy those roles.
+
 ## Usage
 
 After installation, tell Codex what you want to do:
@@ -56,6 +64,9 @@ After installation, tell Codex what you want to do:
 | Task | Example request |
 | --- | --- |
 | Delegate work | Delegate a review of the login feature, identify problems, and fix them. |
+| Inspect role settings | Use feather-model to show the current models and reasoning effort. |
+| Change a session setting | Use feather-model to set scout reasoning to medium for this session only. |
+| Save a role setting | Use feather-model to permanently set executor to gpt-6-sol with high reasoning. |
 | Save progress | Use feather-handoff to save a handoff for the current work. |
 | List work | Use feather-handoff to list the current handoffs. |
 | Resume work | Use feather-handoff to resume the login feature work. |

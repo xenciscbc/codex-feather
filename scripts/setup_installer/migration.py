@@ -61,7 +61,8 @@ def migrate(environment: Environment, bundle: Bundle, components: list[str], sou
             if old_link:
                 entrances.manage(plan, source, bundle, component, old_link, remove=True)
             if new_link:
-                report["entrances"][component] = entrances.manage(plan, destination, bundle, component, new_link)
+                report["entrances"][component] = entrances.manage(plan, destination, bundle, component, new_link,
+                                                                   overrides=moved.get("model_overrides"))
                 moved["entrance"] = new_link
         destination_state["components"][component] = moved
         del source_state["components"][component]

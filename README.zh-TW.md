@@ -13,7 +13,7 @@
 
 ### 原生 Codex plugin
 
-Repository 現在包含 `feather-handoff` 與 `feather-setup` 兩個 skills 的 plugin 封裝。此版本發布後，可透過 Git marketplace 安裝：
+Repository 包含 `feather-handoff`、`feather-setup` 與 `feather-model` 三個 skills 的 plugin 封裝。可透過 Git marketplace 安裝已發布版本：
 
 ```powershell
 codex plugin marketplace add xenciscbc/codex-feather
@@ -49,6 +49,14 @@ codex plugin add codex-feather@codex-feather
 
 可指定子任務的模型或 reasoning，其餘採角色預設；不改變使用者的主模型與並行偏好。能力或模型組合不可用時會回報限制。預設值與完整規則見 [分工規則](templates/AGENTS.md)。
 
+### 修改角色模型
+
+說 **「用 feather-model 列出目前角色設定」**。它會先列出每個角色的模型、推理強度與安裝來源，再詢問想修改的項目。列出修改前後的值後，最後詢問是 **僅本次 session** 還是 **永久修改**；已在請求中說明的選擇不會重複詢問。
+
+Session 修改只套用到這段對話後續的子 Agent 派工，不寫入檔案。永久修改依角色實際安裝位置決定：專案安裝修改專案，共用的使用者安裝修改全域。因此，專案若沿用全域角色，永久修改也會影響共用該安裝的其他專案。套用前會預覽影響路徑；所有權不明或指引衝突時停止寫入。
+
+永久設定會在支援的 setup 更新與範圍遷移後保留。未指定的欄位維持原值，已啟動的子 Agent 不變；保存的指引由新 session 載入。`feather-model` 由 plugin 提供，需要 Python 3.11+ 與 PyYAML，也能管理既有獨立安裝器部署的角色。單純安裝 plugin 不會部署角色。
+
 ## 使用
 
 安裝後，直接對 Codex 說你要做什麼：
@@ -56,6 +64,9 @@ codex plugin add codex-feather@codex-feather
 | 想做的事 | 可以這樣說 |
 | --- | --- |
 | 分工處理任務 | 幫我分工檢查登入功能，找出問題並修正。 |
+| 查看角色設定 | 用 feather-model 列出目前模型與推理強度。 |
+| 本次調整推理強度 | 用 feather-model 將 scout 的推理強度改成 medium，只限這次 session。 |
+| 永久修改角色設定 | 用 feather-model 永久將 executor 設成 gpt-6-sol，推理強度 high。 |
 | 保存目前進度 | 用 feather-handoff 交接目前工作。 |
 | 查看工作清單 | 用 feather-handoff 列出目前的交接。 |
 | 接續工作 | 用 feather-handoff 接續登入功能的工作。 |

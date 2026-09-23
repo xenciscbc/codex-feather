@@ -60,7 +60,7 @@ class PluginSetupTest(unittest.TestCase):
         self.addCleanup(cleanup)
         self.plugin = self.directory / "plugin cache/codex-feather"
         self.plugin.mkdir(parents=True)
-        for name in (".codex-plugin", "templates", "scripts", "skills/feather-setup", "skills/feather-handoff", "docs"):
+        for name in (".codex-plugin", "templates", "scripts", "skills/feather-setup", "skills/feather-handoff", "skills/feather-model", "docs"):
             source = ROOT / name
             target = self.plugin / name
             shutil.copytree(source, target, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
@@ -95,7 +95,7 @@ class PluginSetupTest(unittest.TestCase):
                     "--codex", str(self.codex), "--json", *map(str, extra)]
         environment = {key: value for key, value in os.environ.items() if not key.upper().startswith("CODEX_")}
         environment.pop("PYTHONDONTWRITEBYTECODE", None)
-        environment.update(PYTHONUTF8="1", HOME=str(self.user_home),
+        environment.update(PYTHONUTF8="1", GIT_OPTIONAL_LOCKS="1", HOME=str(self.user_home),
                            USERPROFILE=str(self.user_home))
         return subprocess.run(command, cwd=self.other_cwd, env=environment, capture_output=True,
                               text=True, encoding="utf-8", timeout=45)
@@ -113,6 +113,39 @@ class PluginSetupTest(unittest.TestCase):
         self.assertEqual(self.target_files(), targets_before)
         self.assertEqual(self.plugin_files(), source_before)
         self.assertFalse(any(path.name == "__pycache__" for path in self.plugin.rglob("*")))
+
+    def test_git_backed_cache_is_unchanged_by_check_and_preview(self):
+        git_executable = shutil.which("git")
+        if git_executable is None:
+            self.skipTest("Git is required for the native Git-cache regression")
+        git = [git_executable, "-c", f"safe.directory={self.plugin.as_posix()}",
+               "-c", "user.name=Feather Test", "-c", "user.email=feather@example.invalid",
+               "-c", "commit.gpgsign=false", "-c", f"core.hooksPath={self.directory / 'no-hooks'}"]
+
+        def run_git(*arguments):
+            result = subprocess.run([*git, *arguments], cwd=self.plugin, capture_output=True,
+                                    text=True, encoding="utf-8", timeout=30,
+                                    env={**os.environ, "GIT_OPTIONAL_LOCKS": "1"})
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+        run_git("init")
+        run_git("add", "templates/scout.toml")
+        run_git("commit", "-m", "Track a plugin template")
+        # Simulate stale index stat data after a Git snapshot is copied into a cache.
+        template = self.plugin / "templates/scout.toml"
+        timestamp = template.stat()
+        os.utime(template, ns=(timestamp.st_atime_ns, timestamp.st_mtime_ns + 2_000_000_000))
+        source_before = self.plugin_files()
+        targets_before = self.target_files()
+        for action, options, expected_code in (("check", (), 1), ("install", ("--dry-run",), 0)):
+            with self.subTest(action=action):
+                result = self.run_setup(action, *options)
+                self.assertEqual(result.returncode, expected_code, result.stderr + result.stdout)
+                self.assertEqual(self.plugin_files(), source_before)
+                self.assertEqual(self.target_files(), targets_before)
+        # Positive control: the fixture really does require an index refresh.
+        run_git("status", "--porcelain", "--untracked-files=no")
+        self.assertNotEqual((self.plugin / ".git/index").read_bytes(), source_before[".git/index"])
 
     def test_delegation_lifecycle_preserves_unrelated_content_and_handoff(self):
         source_before = self.plugin_files()

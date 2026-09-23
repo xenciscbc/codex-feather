@@ -8,7 +8,7 @@
 
 | 命令 | 結果 |
 | --- | --- |
-| `python -m unittest discover -s tests -p test_plugin_setup.py -v` | 11 項通過（含 review 修正的兩項回歸測試） |
+| `python -m unittest discover -s tests -p test_plugin_setup.py -v` | 12 項通過（含參數解析與 Git 快取保全回歸測試） |
 | `python -m unittest discover -s tests -p test_setup.py` | 59 項完成，57 通過、2 略過 |
 | `python -m unittest discover -s tests -p test_trial.py` | 19 項通過 |
 | Plugin creator 的 `validate_plugin.py .` | 通過 |
@@ -22,6 +22,8 @@
 新測試從不含 Git 資料的隔離 plugin 副本與無關 cwd 執行 setup，覆蓋：dry-run 不修改目標、專案與使用者範圍、更新採新 plugin 模板、移除與範圍遷移、既有 handoff 保全、顯式舊版 handoff 清理、來源不明角色衝突、禁止重複安裝 handoff、缺少 PyYAML 時停止，以及 plugin 快取不產生 bytecode 或被改寫。測試沒有以環境變數禁止 bytecode 來掩蓋快取保護行為。
 
 Review 發現兩層 parser 對縮寫的解讀不同：`remove --comp handoff` 會被補上的預設值改成移除 delegation；混用完整與縮寫選項也能繞過 handoff 安裝限制。修正後底層安裝器同樣關閉選項縮寫，未知選項在執行操作前以參數錯誤退出。新增回歸測試覆蓋混合選項的兩種順序、`--comp=all` 與 `--comp=handoff`，以實際非 dry-run 呼叫及目標檔案前後比較確認沒有寫入或刪除；完整的 `--components handoff` 仍能正常執行。
+
+後續從 GitHub 安裝已發布的 `e444ae9` 時，marketplace、plugin 安裝與技能載入均成功，但發現原生 Git cache 保留 `.git`；setup 共用的 build metadata 探測會因 `git status` 更新 `.git/index`。已在 Git 命令停用 optional locks。新增測試建立真實 Git index，再改動已追蹤模板的時間戳，確認 `check` 與 install `--dry-run` 都保持整份快取及目標檔案內容不變；最後以一般 `git status` 確認同一 fixture 確實會刷新 index，避免假陽性。修正前測試會失敗，修正後 12 項 plugin 測試、18 個檔案的 mypy 與來源離線 bundle 建置通過。此項修正尚未包含在上述已發布提交內。
 
 ## 原生 CLI 路徑
 
@@ -42,3 +44,22 @@ Review 發現兩層 parser 對縮寫的解讀不同：`remove --comp handoff` �
 主 Agent 完成產品實作與整合；analyst 檢查既有安裝、重複技能與入口所有權，executor 負責隔離測試。原生派工設定為 analyst `gpt-6-sol/high`、executor `gpt-6-sol/medium`，來自目前角色預設；子 Agent 回傳與測試結果已由主 Agent 檢閱。首次誤用舊模型的 analyst 派工已中止，未採用其成果。工具接受的設定不等於服務端逐回應 telemetry，實際執行模型仍未確認。
 
 另由獨立 executor 只取得 skill、隔離路徑與「專案安裝後移除角色，保留個人指引和交接資料」請求，完成 skill 前向試用。`dist/setup-skill-trial/` 的安裝／移除預覽及安裝後健檢成功；移除後健檢如預期回報角色缺少，沒有誤報仍已安裝。原指引與 handoff marker 的雜湊未變。主 Agent 核對最終檔案、空的元件所有權紀錄與備份；本輪沒有真實模型工作或全域部署。
+
+## feather-model（plugin 1.2.0）
+
+同日新增模型設定 skill、JSON 查詢／預覽／套用工具，並更新中英文 README。永久設定存入 delegation 安裝紀錄，更新受管理表格；role TOML 維持可由原生 spawn 參數覆寫。此段是本機來源驗證，不表示已發布或更新使用者的全域安裝。
+
+| 驗證 | 結果 |
+| --- | --- |
+| `python -m unittest tests.test_model -v` | 11 項通過 |
+| `python -m unittest discover -s tests -p test_setup.py` | 59 項完成，57 通過、2 略過 |
+| `python -m unittest discover -s tests -p test_plugin_setup.py` | 12 項通過 |
+| mypy：既有來源範圍加 `skills/feather-model/scripts/model.py` | 20 個來源檔案通過；既有未標註函式仍非 strict 檢查 |
+| Plugin validator、兩個 setup/model skill validator | 通過 |
+| `build_setup.py --prepare-only` 與 payload SHA-256 | 通過，包含新增 runtime 的來源摘要 |
+
+模型測試覆蓋單欄修改、預覽無寫入、plan 不符拒絕套用、重裝與更新保留設定、project → user 遷移、沿用使用者安裝、共享入口不覆寫模型值、異名角色與原生模型鎖定衝突、缺少入口／所有權、缺少相依套件的 JSON 錯誤，以及查詢／預覽不修改隔離 plugin cache 或產生 bytecode。
+
+獨立 executor 依新 skill 在 `dist/model-skill-trial/` 執行「scout 推理強度改成 medium，永久保存」，驗證預覽、套用、再次查詢及 setup 更新後仍保留 `gpt-6-luna / medium`。接著評估「executor 改成 high，只限這次 session」，未執行寫入或派工。主 Agent 已核對報告、實際安裝表格及 14 個檔案的 SHA-256；session 前後清單相同。工具接受模型 ID 不代表 provider 支援，skill 仍須核對原生可用組合；未驗證真實子 Agent 的模型 telemetry。
+
+主 Agent 完成 skill、文件與整合，executor 負責設定工具與獨立試用；兩次委派均顯式要求 `gpt-6-sol / medium`，符合角色預設。已核對回傳範圍與成果，沒有取得逐回應服務端模型證據。

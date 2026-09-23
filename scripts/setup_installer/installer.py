@@ -104,9 +104,11 @@ def execute(action: str, environment: Environment, bundle: Bundle, components: l
             state["components"][component] = {"version": bundle.version,
                                                "files": {target: digest(data) for target, data in files.items()},
                                                "contents": {target: base64.b64encode(data).decode() for target, data in files.items()}}
+            if component == "delegation" and old and old.get("model_overrides"):
+                state["components"][component]["model_overrides"] = old["model_overrides"]
             if old and old.get("entrance"):
                 state["components"][component]["entrance"] = old["entrance"]
-            if entrance != "none" or (action == "update" and old and old.get("entrance")):
+            if entrance != "none" or (old and old.get("entrance")):
                 record = state["components"][component]
                 link = entrances.location(environment, entrance) if entrance != "none" else old["entrance"]
                 report["entrances"][component] = entrances.attach(plan, environment, bundle, component, record, link,

@@ -8,9 +8,12 @@ from .transaction import Plan
 from .conflicts import ConflictError
 
 
-def instruction(bundle: Bundle, component: str) -> str:
+def instruction(bundle: Bundle, component: str, overrides: dict | None = None) -> str:
     if component == "delegation":
         body = bundle.payload["assets/templates/AGENTS.md"].decode("utf-8-sig").strip()
+        if overrides:
+            from .model_settings import render
+            body = render(body, overrides)
         guard = ("Apply this delegation guidance only when scout, analyst, mech-executor and executor "
                  "are available in the current environment. If unavailable, report the missing capability "
                  "and keep the work with the main Agent. This declaration does not install or enable roles.")
@@ -69,14 +72,15 @@ def attach(plan: Plan, environment: Environment, bundle: Bundle, component: str,
            link: dict[str, str], replace: bool = False) -> dict:
     if record.get("entrance") and record["entrance"] != link:
         raise ValueError("Existing entrance is in another scope; remove it explicitly before changing scope")
-    result = manage(plan, environment, bundle, component, link, replace=replace)
+    result = manage(plan, environment, bundle, component, link, replace=replace,
+                    overrides=record.get("model_overrides"))
     record["entrance"] = link
     return result
 
 
 def manage(plan: Plan, environment: Environment, bundle: Bundle, component: str,
            link: dict[str, str], remove: bool = False, replace: bool = False,
-           transfer_to: Environment | None = None) -> dict:
+           transfer_to: Environment | None = None, overrides: dict | None = None) -> dict:
     root, ledger_path, ledger = load(plan, environment, link)
     scope = link["scope"]
     old = ledger["blocks"].get(component)
@@ -93,9 +97,13 @@ def manage(plan: Plan, environment: Environment, bundle: Bundle, component: str,
     current = before or b""
     begin = f"<!-- feather-setup:{component}:begin -->".encode()
     end = f"<!-- feather-setup:{component}:end -->".encode()
-    block = b"\n\n" + begin + b"\n" + instruction(bundle, component).encode() + b"\n" + end + b"\n"
+    block = b"\n\n" + begin + b"\n" + instruction(bundle, component, overrides).encode() + b"\n" + end + b"\n"
     if old:
         prior = old["content"].encode()
+        if component == "delegation" and not remove and transfer_to is None and (len(old["owners"]) > 1 or owner not in old["owners"]):
+            from .model_settings import values
+            if values(prior.decode()) != values(block.decode()):
+                raise ValueError(f"Delegation entrance cannot be shared or rewritten with different model defaults: {target}")
         if current.count(begin) != 1 or current.count(end) != 1 or current.count(prior) != 1:
             if current.count(begin) != 1 or current.count(end) != 1 or not replace:
                 raise ConflictError(target, prior, current, None if remove else block)

@@ -1,6 +1,6 @@
 # Feather 原生 plugin
 
-Feather 的原生 plugin 包含 `feather-handoff` 與 `feather-setup`。Plugin 管理 skills 的取得與載入；setup skill 呼叫既有安裝器，管理 plugin 外部的四角色 TOML 與分工入口。沒有自動安裝 hook，也不會在安裝 plugin 時修改全域指引。
+Feather 的原生 plugin 包含 `feather-handoff`、`feather-setup` 與 `feather-model`。Plugin 管理 skills 的取得與載入；setup skill 呼叫既有安裝器，管理 plugin 外部的四角色 TOML 與分工入口；model skill 引導修改角色模型與推理強度。沒有自動安裝 hook，也不會在安裝 plugin 時修改全域指引。
 
 ## 安裝與首次設定
 
@@ -11,11 +11,15 @@ codex plugin marketplace add xenciscbc/codex-feather
 codex plugin add codex-feather@codex-feather
 ```
 
-開新 session，確認 `feather-handoff` 與 `feather-setup` 列出，再說：「使用 feather-setup，將 Feather 設定為全域使用」或「只設定目前專案」。LLM 會檢查既有部署，預覽並套用指定範圍的角色與入口，再執行健檢。確認角色載入仍需新 session。
+開新 session，確認三個 skills 列出，再說：「使用 feather-setup，將 Feather 設定為全域使用」或「只設定目前專案」。LLM 會檢查既有部署，預覽並套用指定範圍的角色與入口，再執行健檢。確認角色載入仍需新 session。`feather-model` 自 plugin 1.2.0 提供。
 
 Setup 的來源執行需要 Python 3.11+ 與 PyYAML；相依清單為 plugin 根目錄的 `requirements-setup.txt`。LLM 先沿用合適的 Python 環境；缺少套件時先取得安裝授權。這條路徑不要求 PyInstaller 或 mypy；既有獨立二進位安裝方式仍可使用。
 
 ## 更新
+
+角色模型與推理強度使用 `feather-model` 調整：先列出現況，再選擇欄位，最後選擇 session 或永久。Session 只影響後續派工；永久設定寫入角色擁有者的安裝紀錄與受管理指引，隨 setup 更新與遷移保留。全域角色的永久變更會影響共用安裝的專案；工具先預覽實際範圍，遇到所有權或入口衝突則停止，不改寫角色 TOML 的模型欄位。詳見 [README 的模型設定流程](../README.zh-TW.md#修改角色模型)。
+
+目前永久修改要求角色有可驗證的安裝紀錄，且分工入口與角色在同一範圍、只有一個擁有者。缺少入口、跨範圍入口、共享入口或其他可見分工入口時，先依診斷處理原安裝；工具不會自行遷移或接管檔案。沒有入口時，查詢列出的值會標示為封裝預設，不能視為正在生效的派工設定。
 
 ```powershell
 codex plugin marketplace upgrade codex-feather

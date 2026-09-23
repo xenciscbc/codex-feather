@@ -5,11 +5,11 @@ description: "Set up, check, update, migrate, or remove Feather roles and agent 
 
 # Feather Setup
 
-The plugin supplies `feather-handoff` and this setup skill. Native plugin installation does not deploy the four custom roles or write agent guidance. Use the bundled [setup entry point](scripts/setup.py) for those external files; it calls Feather's existing installer with ownership records, conflict checks, backups and rollback. Do not reproduce its writes with shell or editor commands.
+The plugin supplies `feather-handoff`, `feather-model` and this setup skill. Native plugin installation does not deploy the four custom roles or write agent guidance. Use the bundled [setup entry point](scripts/setup.py) for those external files; it calls Feather's existing installer with ownership records, conflict checks, backups and rollback. Do not reproduce its writes with shell or editor commands. For changing role models or reasoning effort, use the available `feather-model` skill; setup updates preserve its saved choices.
 
 ## Resolve the request
 
-- Establish the target project and requested operation. Resolve all tool paths from this skill's location, not the target project's working directory. The complete plugin root is two directories above this `SKILL.md`; keep its `scripts/`, `templates/`, `docs/`, and both skills together.
+- Establish the target project and requested operation. Resolve all tool paths from this skill's location, not the target project's working directory. The complete plugin root is two directories above this `SKILL.md`; keep its `scripts/`, `templates/`, `docs/`, and all three skills together.
 - Preserve scope and home choices already provided. User scope shares roles across projects; project scope limits the deployment to one project. For a new installation with no scope preference, ask which scope to use while doing read-only checks. Existing installation records determine update/removal ownership; do not silently move it.
 - Inspect before changing: run `check` for the intended scope and read its component, entrance and runtime results. A reused component must be updated at its owning scope. `check` compares installed files with ownership records; it does not prove they match the new plugin payload. Use an `update --dry-run` to inspect the new payload.
 - The source tool requires Python 3.11+ and PyYAML from the plugin's `requirements-setup.txt`. Reuse a suitable interpreter. If dependencies are missing, explain the requirement and obtain authorization for installation; do not install packages or download executables merely by loading this skill. Read-only file inspection remains possible.
