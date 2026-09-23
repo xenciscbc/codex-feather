@@ -20,7 +20,7 @@ HANDOFF_SCENARIOS = {name: family for family in HANDOFF_FAMILIES for name in fam
 SCENARIOS = {**SCENARIOS, **{name: family.SCENARIOS[name] for name, family in HANDOFF_SCENARIOS.items()}}
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPECTED = {"role": "scout", "model": "gpt-5.6-luna", "reasoning": "low"}
+EXPECTED = {"role": "scout", "model": "gpt-6-luna", "reasoning": "low"}
 
 
 def write_json(path, value):

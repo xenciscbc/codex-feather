@@ -1,9 +1,9 @@
 """Known-answer trials; acceptance expectations stay outside the model workspace."""
 ROLES = {
-    "scout": ("gpt-5.6-luna", "low", "read-only"),
-    "analyst": ("gpt-5.6-sol", "high", "workspace-write"),
-    "mech-executor": ("gpt-5.6-luna", "medium", "workspace-write"),
-    "executor": ("gpt-5.6-sol", "medium", "workspace-write"),
+    "scout": ("gpt-6-luna", "low", "read-only"),
+    "analyst": ("gpt-6-sol", "high", "workspace-write"),
+    "mech-executor": ("gpt-6-luna", "medium", "workspace-write"),
+    "executor": ("gpt-6-sol", "medium", "workspace-write"),
 }
 
 SCENARIOS = {
@@ -71,9 +71,9 @@ SCENARIOS = {
 }
 
 for scenario, fixture, role, model, effort, request in [
-    ("scout-model", "scout", "scout", "gpt-5.6-sol", "low", "For this scout child, explicitly use model gpt-5.6-sol; reasoning is unspecified."),
-    ("scout-effort", "scout", "scout", "gpt-5.6-luna", "high", "For this scout child, explicitly use reasoning high; model is unspecified."),
-    ("analyst-override", "analyst-code", "analyst", "gpt-5.6-luna", "low", "For this analyst child, explicitly use model gpt-5.6-luna and reasoning low."),
+    ("scout-model", "scout", "scout", "gpt-6-sol", "low", "For this scout child, explicitly use model gpt-6-sol; reasoning is unspecified."),
+    ("scout-effort", "scout", "scout", "gpt-6-luna", "high", "For this scout child, explicitly use reasoning high; model is unspecified."),
+    ("analyst-override", "analyst-code", "analyst", "gpt-6-luna", "low", "For this analyst child, explicitly use model gpt-6-luna and reasoning low."),
 ]:
     SCENARIOS[scenario] = {
         "fixture": fixture, "roles": [role], "writes": [],

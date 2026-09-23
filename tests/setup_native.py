@@ -52,7 +52,7 @@ def capture_tools(codex: str, project: Path, user_home: Path, codex_home: Path) 
                 f'base_url="http://127.0.0.1:{server.server_port}/v1",'
                 'wire_api="responses",requires_openai_auth=false,request_max_retries=0,stream_max_retries=0}')
     command = [codex, "exec", "--skip-git-repo-check", "--sandbox", "read-only", "--json",
-               "--model", "gpt-5.6-sol", "-c", 'model_provider="feather_probe"', "-c", provider,
+               "--model", "gpt-6-sol", "-c", 'model_provider="feather_probe"', "-c", provider,
                "-c", "agents.enabled=true", "Do not perform work. This is a local tool-discovery capture."]
     try:
         result = subprocess.run(command, cwd=project, env=environment, capture_output=True,

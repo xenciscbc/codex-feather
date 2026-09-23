@@ -13,10 +13,10 @@ Role defaults for dispatch (model / reasoning):
 
 | Role | Model | Reasoning |
 | --- | --- | --- |
-| scout | gpt-5.6-luna | low |
-| analyst | gpt-5.6-sol | high |
-| mech-executor | gpt-5.6-luna | medium |
-| executor | gpt-5.6-sol | medium |
+| scout | gpt-6-luna | low |
+| analyst | gpt-6-sol | high |
+| mech-executor | gpt-6-luna | medium |
+| executor | gpt-6-sol | medium |
 
 Resolve model and reasoning independently before delegation: an explicit user setting applicable to that child takes precedence over role defaults; an unspecified field uses the role default, or parent inheritance for a generic child. A setting scoped only to the main Agent does not override child role defaults. Preserve role responsibilities and permissions when applying overrides.
 For each named role, always pass both resolved fields explicitly through the native spawn parameters, even when both came from this table. Role TOML files define behavior and permissions and intentionally omit model and model_reasoning_effort: those keys would override spawn values. A model-only request still sends the role's default reasoning; an effort-only request still sends the role's default model.

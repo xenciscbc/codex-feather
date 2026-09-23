@@ -53,7 +53,7 @@ class TrialTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             manifest = json.loads((trial / "manifest.json").read_text())
             self.assertEqual(manifest["actual"], "unconfirmed")
-            self.assertEqual(manifest["expected"], {"role": "scout", "model": "gpt-5.6-luna", "reasoning": "low"})
+            self.assertEqual(manifest["expected"], {"role": "scout", "model": "gpt-6-luna", "reasoning": "low"})
             self.assertTrue((trial / "home/agents/scout.toml").is_file())
             self.assertTrue((trial / "workspace/AGENTS.md").is_file())
             self.assertFalse((trial / "home/auth.json").exists())
@@ -261,7 +261,7 @@ def retry_delay(attempt, base, cap):
 
     def test_role_model_locks_are_rejected_without_changing_other_fields(self):
         for role in ["scout", "analyst", "mech-executor", "executor"]:
-            for binding in ['model = "gpt-5.6-luna"', 'model_reasoning_effort = "low"']:
+            for binding in ['model = "gpt-6-luna"', 'model_reasoning_effort = "low"']:
                 with self.subTest(role=role, binding=binding), tempfile.TemporaryDirectory() as temporary:
                     trial = Path(temporary) / "trial"
                     self.assertEqual(self.run_trial("prepare", trial).returncode, 0)
@@ -272,9 +272,9 @@ def retry_delay(attempt, base, cap):
                     self.assertIn("locks model or reasoning", result.stderr)
 
     def test_override_trials_keep_unspecified_defaults_and_sources_readonly(self):
-        cases = [("scout-model", "scout", "gpt-5.6-sol", "low", "settings.toml"),
-                 ("scout-effort", "scout", "gpt-5.6-luna", "high", "settings.toml"),
-                 ("analyst-override", "analyst", "gpt-5.6-luna", "low", "access.py")]
+        cases = [("scout-model", "scout", "gpt-6-sol", "low", "settings.toml"),
+                 ("scout-effort", "scout", "gpt-6-luna", "high", "settings.toml"),
+                 ("analyst-override", "analyst", "gpt-6-luna", "low", "access.py")]
         for scenario, role, model, effort, fixture in cases:
             with self.subTest(scenario=scenario), tempfile.TemporaryDirectory() as temporary:
                 trial = Path(temporary) / "trial"
