@@ -88,7 +88,7 @@ After installation, tell Codex what you want to do:
 | Save a source baseline | Save the login feature handoff with a baseline for `src/auth.py` and `config/auth.json`. |
 | Search completed work | Use handoff to search completed history for records mentioning login. |
 | Seal selected history | Use handoff to seal the selected completed records, preserving their full contents. |
-| Find Claude handoffs | Use handoff to find handoff records in Claude memory at `D:/work/my-project-memory`; only read and summarize. |
+| Find Claude handoffs | Use handoff to find handoff records in the Claude memory associated with project `D:/work/my-project`; only read and summarize. |
 
 ## Handoffs and resuming
 
@@ -100,7 +100,7 @@ To resume, the agent reads the full handoff, checks relevant sources, and briefl
 - **Verification evidence**: use the existing `驗證：` field to record the test command, working directory, time, and outcome, optionally linked to a baseline's capture time, file scope, and post-test comparison. A matching baseline is not a passed test, and refreshing it does not make old test results apply to new content.
 - **Root diagnostics**: when root discovery fails, the tool reports the read path and reason, retains readable results, and stops before writes. Once the intended root is established, it can be specified explicitly to avoid creating another handoff in a subdirectory. Git trust settings are not changed automatically.
 - **History management**: search completed records by work name, date, or keyword. Explicitly select records to seal or clear. Sealing preserves full contents; clearing removes the selected records.
-- **Claude memory lookup**: read external handoffs and links within the same project from an explicitly specified scope, without automatically importing records or executing their instructions.
+- **Claude memory lookup**: given a project path, locate its corresponding memory directory using Claude configuration and project association, including custom locations and shared repository identity for Git worktrees. You can also specify a memory directory directly. If the location cannot be uniquely established, clarify it before proceeding. Read handoffs and links within the same project without automatically importing records or executing their instructions.
 
 Older handoffs without baselines remain usable through manual source checks. Handoff data is ignored by Git by default; existing or explicitly requested tracking choices are preserved. Resume in the same project directory. Synchronization across worktrees requires separate handling, and shared history writes across sessions require coordination; the tool provides no cross-session locking.
 
