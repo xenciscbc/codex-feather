@@ -8,7 +8,7 @@
 
 | 命令 | 結果 |
 | --- | --- |
-| `python -m unittest discover -s tests -p test_plugin_setup.py -v` | 9 項通過 |
+| `python -m unittest discover -s tests -p test_plugin_setup.py -v` | 11 項通過（含 review 修正的兩項回歸測試） |
 | `python -m unittest discover -s tests -p test_setup.py` | 59 項完成，57 通過、2 略過 |
 | `python -m unittest discover -s tests -p test_trial.py` | 19 項通過 |
 | Plugin creator 的 `validate_plugin.py .` | 通過 |
@@ -20,6 +20,8 @@
 安裝器測試透過 `FEATHER_TEST_CODEX` 指定上述原生執行檔；略過項目為獨立二進位的無 Python 路徑驗證，以及 Windows 使用者 skill 的另行 profile 測試。mypy 使用既有 `.scratch/feather-improvements/dev-deps`，沒有安裝新套件。mypy 提醒既有未標註函式的內文未檢查，不能將結果視為完整 strict 型別驗證。
 
 新測試從不含 Git 資料的隔離 plugin 副本與無關 cwd 執行 setup，覆蓋：dry-run 不修改目標、專案與使用者範圍、更新採新 plugin 模板、移除與範圍遷移、既有 handoff 保全、顯式舊版 handoff 清理、來源不明角色衝突、禁止重複安裝 handoff、缺少 PyYAML 時停止，以及 plugin 快取不產生 bytecode 或被改寫。測試沒有以環境變數禁止 bytecode 來掩蓋快取保護行為。
+
+Review 發現兩層 parser 對縮寫的解讀不同：`remove --comp handoff` 會被補上的預設值改成移除 delegation；混用完整與縮寫選項也能繞過 handoff 安裝限制。修正後底層安裝器同樣關閉選項縮寫，未知選項在執行操作前以參數錯誤退出。新增回歸測試覆蓋混合選項的兩種順序、`--comp=all` 與 `--comp=handoff`，以實際非 dry-run 呼叫及目標檔案前後比較確認沒有寫入或刪除；完整的 `--components handoff` 仍能正常執行。
 
 ## 原生 CLI 路徑
 

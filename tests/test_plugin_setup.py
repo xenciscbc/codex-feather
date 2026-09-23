@@ -222,6 +222,31 @@ class PluginSetupTest(unittest.TestCase):
         self.assertEqual(state["components"]["delegation"]["version"],
                          json.loads((self.plugin / ".codex-plugin/plugin.json").read_text())["version"])
 
+    def test_abbreviated_components_cannot_bypass_handoff_install_guard(self):
+        before = self.target_files()
+        for options in (("--components", "delegation", "--comp", "handoff"),
+                        ("--comp", "handoff", "--components", "delegation"),
+                        ("--components", "delegation", "--comp=all")):
+            with self.subTest(options=options):
+                result = self.run_setup("install", *options)
+                self.assertEqual(result.returncode, 2, result.stderr + result.stdout)
+                self.assertIn("unrecognized arguments", result.stderr)
+                self.assertEqual(self.target_files(), before)
+
+    def test_abbreviated_removal_target_cannot_remove_delegation(self):
+        self.assert_success(self.run_setup("install", "--entrance", "project"))
+        before = self.target_files()
+        for options in (("--comp", "handoff"), ("--comp=handoff",)):
+            with self.subTest(options=options):
+                result = self.run_setup("remove", *options)
+                self.assertEqual(result.returncode, 2, result.stderr + result.stdout)
+                self.assertIn("unrecognized arguments", result.stderr)
+                self.assertEqual(self.target_files(), before)
+        # A valid explicit handoff removal still leaves the installed roles untouched.
+        report = self.assert_success(self.run_setup("remove", "--components", "handoff"))
+        self.assertEqual(report["components"]["handoff"]["status"], "not-managed")
+        self.assertEqual(self.target_files(), before)
+
     def test_missing_runtime_dependency_stops_before_target_writes(self):
         before = self.target_files()
         result = subprocess.run(

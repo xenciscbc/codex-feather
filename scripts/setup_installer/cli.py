@@ -22,7 +22,8 @@ def main(argv: list[str] | None = None) -> int:
     for stream in (sys.stdout, sys.stderr):
         if isinstance(stream, io.TextIOWrapper):
             stream.reconfigure(encoding="utf-8")
-    parser = argparse.ArgumentParser(description="Install selected Feather capabilities from an offline bundle.")
+    parser = argparse.ArgumentParser(description="Install selected Feather capabilities from an offline bundle.",
+                                     allow_abbrev=False)
     parser.add_argument("action", nargs="?", choices=["install", "check", "update", "remove", "migrate"])
     parser.add_argument("--version", action="version", version=f"feather-setup {VERSION}")
     parser.add_argument("--project", type=Path, default=Path.cwd())

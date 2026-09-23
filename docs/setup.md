@@ -21,6 +21,8 @@ Windows 直接執行 `feather-setup.exe`；Linux 在解壓資料夾執行 `./fea
 
 以下以 PowerShell 為例；Linux 將 `./feather-setup.exe` 改成 `./feather-setup`，路徑改為 Linux 路徑。完整命令直接执行，不另行確認。省略 `--components` 時選整套；省略 `--scope` 時選專案；新安裝省略 `--entrance` 時不新增入口。
 
+選項使用完整名稱，例如 `--components`；安裝器與 plugin 入口均拒絕 `--comp` 等縮寫，避免包裝層與執行層對操作範圍的解讀不同。
+
 ```powershell
 # 整套專案安裝，先預覽，再套用
 ./feather-setup.exe install --project 'D:/work/my-project' --components all --scope project --entrance project --dry-run
