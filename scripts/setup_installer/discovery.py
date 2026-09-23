@@ -8,6 +8,7 @@ import yaml  # type: ignore[import-untyped]
 from .bundle import HANDOFF_ROOT, LEGACY_HANDOFF_ROOT, LEGACY_ROLES, ROLES
 from .environment import Environment
 from .transaction import Plan, read_regular, validate_regular
+from .state import read_state
 
 
 def skill_name(content: bytes) -> str | None:
@@ -49,10 +50,27 @@ def unowned_handoff_paths(environment: Environment, plan: Plan, owned: set[str] 
     return paths
 
 
-def reuse_candidate(environment: Environment, component: str, ignore: Environment | None = None,
-                    owned: set[str] | None = None) -> dict | None:
+def visible_environments(environment: Environment) -> list[Environment]:
     candidates = [replace(environment, scope="user")]
     candidates.extend(replace(environment, scope="project", project=root) for root in environment.project_roots())
+    return candidates
+
+
+def require_standalone_handoff_scope(environment: Environment, plan: Plan) -> None:
+    """A plugin's zero-file ownership record still prevents a duplicate provider."""
+    for other in visible_environments(environment):
+        state = read_state(other, plan)
+        record = state["components"].get("handoff")
+        if record is not None and not isinstance(record, dict):
+            raise ValueError(f"Invalid handoff installation record: {other.state_path}")
+        if record and record.get("provider"):
+            raise ValueError(f"Plugin handoff is recorded in {other.scope} scope at {other.state_path}; "
+                             "manage that installation explicitly before deploying a standalone skill")
+
+
+def reuse_candidate(environment: Environment, component: str, ignore: Environment | None = None,
+                    owned: set[str] | None = None) -> dict | None:
+    candidates = visible_environments(environment)
     identities = ([HANDOFF_ROOT + "SKILL.md"] if component == "handoff"
                   else [f".codex/agents/{role}.toml" for role in ROLES])
     owned = owned or set()

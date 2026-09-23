@@ -8,9 +8,10 @@ from typing import Any
 
 from .bundle import Bundle, digest, validate_target
 from .conflicts import ConflictError
-from .discovery import reuse_candidate, unowned_handoff_paths
+from .discovery import reuse_candidate, unowned_handoff_paths, require_standalone_handoff_scope
 from .environment import Environment, find_codex
-from .installer import read_state, plugin_provider
+from .installer import plugin_provider
+from .state import read_state
 from . import entrances
 from .transaction import Plan
 
@@ -42,6 +43,8 @@ def migrate(environment: Environment, bundle: Bundle, components: list[str], sou
             collisions = unowned_handoff_paths(source, plan) + unowned_handoff_paths(destination, plan)
             if collisions:
                 raise ValueError(f"Plugin handoff overlaps an unowned standalone skill: {collisions}; resolve it before migrating")
+        elif component == "handoff":
+            require_standalone_handoff_scope(destination, plan)
         if component in destination_state["components"]:
             raise ValueError(f"Migration destination already records {component}; remove that selection explicitly first")
         other = reuse_candidate(destination, component, ignore=source)

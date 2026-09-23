@@ -757,6 +757,61 @@ class SetupTest(unittest.TestCase):
         self.assertEqual(json.loads(result.stdout)["changes"], [])
         self.assertEqual((self.codex_home / "AGENTS.md").read_bytes(), entry)
 
+    def test_interactive_preflight_checks_healthy_user_after_corrupt_project(self):
+        state = self.project / ".feather/setup/state.json"
+        state.parent.mkdir(parents=True)
+        corrupted = b"{invalid project installation record"
+        state.write_bytes(corrupted)
+
+        result = self.run_setup(None, input="check\nuser\n")
+        direct = self.run_setup("check", "--scope", "user")
+        self.assertEqual(result.returncode, direct.returncode, result.stderr + result.stdout)
+        preflight = result.stderr[:result.stderr.index("Operation")]
+        self.assertLess(preflight.index('"scope": "project"'), preflight.index('"scope": "user"'))
+        self.assertIn('"status": "error"', preflight)
+        self.assertIn('"status": "attention-required"', preflight[preflight.index('"scope": "user"'):])
+        self.assertEqual(json.loads(result.stdout)["components"], json.loads(direct.stdout)["components"])
+        self.assertEqual(json.loads(result.stdout)["scope"], "user")
+        self.assertEqual(state.read_bytes(), corrupted)
+
+    def test_interactive_install_ignores_corrupt_unrelated_user_state(self):
+        self.add_delegation()
+        state = self.codex_home / "feather-setup/state.json"
+        state.parent.mkdir(parents=True)
+        corrupted = b"{invalid user installation record"
+        state.write_bytes(corrupted)
+
+        result = self.run_setup(None, "--components", "delegation", input="install\nproject\nnone\nyes\n")
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertIn('"scope": "user"', result.stderr[:result.stderr.index("Operation")])
+        self.assertIn('"status": "error"', result.stderr[:result.stderr.index("Operation")])
+        self.assertEqual(json.loads(result.stdout)["scope"], "project")
+        self.assertTrue((self.project / ".codex/agents/executor.toml").is_file())
+        self.assertEqual(state.read_bytes(), corrupted)
+
+    def test_interactive_selected_corrupt_state_fails_without_writes(self):
+        state = self.project / ".feather/setup/state.json"
+        state.parent.mkdir(parents=True)
+        corrupted = b"{invalid project installation record"
+        state.write_bytes(corrupted)
+
+        result = self.run_setup(None, input="install\nproject\nnone\nyes\n")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('"status": "error"', result.stderr[:result.stderr.index("Operation")])
+        self.assertIn('"error":', result.stderr[result.stderr.index("Operation"):])
+        self.assertEqual(state.read_bytes(), corrupted)
+        self.assertFalse((self.project / ".agents/skills/handoff/SKILL.md").exists())
+
+    def test_interactive_invalid_project_or_bundle_stops_before_choices(self):
+        wrong_project = self.directory / "project-file"
+        wrong_project.write_text("not a directory", encoding="utf-8")
+        for options in [("--project", wrong_project), ("--bundle", self.directory / "missing-bundle")]:
+            with self.subTest(options=options):
+                result = self.run_setup(None, *options, input="install\nproject\nnone\nyes\n")
+                self.assertNotEqual(result.returncode, 0)
+                self.assertNotIn("Operation (", result.stderr)
+                self.assertFalse((self.project / ".agents/skills/handoff/SKILL.md").exists())
+
     def test_interactive_update_conflict_keep_replace_and_remove_use_the_same_engine(self):
         self.assertEqual(self.run_setup("install", "--entrance", "project").returncode, 0)
         target = self.project / ".agents/skills/handoff/SKILL.md"

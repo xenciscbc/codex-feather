@@ -21,6 +21,14 @@ Standards 審查的詞彙缺口已補入 `CONTEXT.md`，重複衝突邏輯已集
 
 修正後重跑 `test_plugin_setup`、`test_setup`、`test_setup_interactive`、`test_upgrade_short_names`：99 項中 97 通過、2 略過，本機紀錄為 `dist/setup-components-validation/review-regression.log`。20 個來源檔案的 mypy 與差異格式檢查通過。
 
+### 跨範圍來源與預檢隔離修正
+
+後續審查重現兩項問題並修正：可見範圍已有零檔案的 plugin handoff 紀錄時，獨立安裝器仍新增副本；互動預檢遇到另一範圍損壞的紀錄時，連不相關的正常操作也被中止。
+
+獨立 handoff 的安裝、更新與遷移現在核對使用者及可見專案／祖先的 provider 紀錄；有效的 plugin 所有權仍需明確處理，不能因沒有獨立 skill 檔案就視為未安裝。紀錄讀取集中於 `setup_installer/state.py`，拒絕損壞的格式、元件或 provider 結構。互動預檢逐範圍顯示錯誤及正常結果；實際操作仍做原有檢查，選中損壞範圍時不寫入。專案路徑與素材包錯誤仍提前停止。
+
+`test_provider_scope`、`test_plugin_setup`、`test_setup`、`test_setup_interactive`、`test_upgrade_short_names`、`test_review_settings` 合計 114 項中 112 通過、2 略過；本機紀錄為 `dist/setup-components-validation/scope-fixes-regression.log`。之後補充一項損壞 provider 結構的案例，再跑四項 provider scope 測試均通過。21 個來源檔案的 mypy 通過。測試涵蓋全域／專案雙向及祖先衝突、CLI 零變更拒絕、保留損壞的未選紀錄，以及選中損壞紀錄時停止寫入。主 Agent 完成來源檢查與整合，executor 負責預檢隔離；均使用隔離目錄，未更新實際全域安裝。
+
 以下保留先前版本的驗證紀錄。
 
 日期：2026-09-23。環境：Windows、Python 3.11、Codex CLI `0.155.0-alpha.16`。這次新增 plugin manifest、Git marketplace、`feather-setup` skill 與既有安裝器的來源入口；沒有修改使用者的全域安裝，也尚未發布遠端版本。

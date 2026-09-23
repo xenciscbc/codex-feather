@@ -6,7 +6,7 @@ from . import entrances
 from .bundle import ROLES, digest
 from .discovery import reuse_candidate
 from .environment import Environment
-from .installer import read_state
+from .state import read_state
 from .transaction import Plan
 
 

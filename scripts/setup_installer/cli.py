@@ -49,13 +49,21 @@ def main(argv: list[str] | None = None, handoff_provider: Path | None = None,
             def preflight() -> None:
                 user_home = args.user_home.resolve()
                 codex_home = args.codex_home or Path(os.environ.get("CODEX_HOME", user_home / ".codex"))
+                project = args.project.resolve(strict=True)
+                if not project.is_dir():
+                    raise ValueError(f"Project directory is not a directory: {project}")
+                codex_home = codex_home.resolve()
                 bundle = Bundle.read(args.bundle.resolve())
                 print("Installed state before choosing an operation:", file=sys.stderr)
                 for scope in ("project", "user"):
-                    environment = Environment(args.project.resolve(strict=True), user_home, codex_home.resolve(), scope)
-                    report = execute("check", environment, bundle, ["all"], args.codex,
-                                     handoff_provider=handoff_provider)
-                    report.pop("_plan_id")
+                    environment = Environment(project, user_home, codex_home, scope)
+                    try:
+                        report = execute("check", environment, bundle, ["all"], args.codex,
+                                         handoff_provider=handoff_provider)
+                        report.pop("_plan_id")
+                    except (OSError, ValueError, KeyError, TypeError) as error:
+                        report = {"action": "check", "project": str(project), "scope": scope,
+                                  "status": "error", "error": str(error), "changes": []}
                     show(report, args.json, sys.stderr)
             interactive.choose(args, arguments, preflight)
         if args.action != "migrate" and (args.source_scope is not None or args.target_scope is not None):

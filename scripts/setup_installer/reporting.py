@@ -15,6 +15,8 @@ def show(report: dict, structured: bool = False, stream: TextIO | None = None) -
         print(f"Project: {report['project']}", file=stream)
     if report.get("scope"):
         print(f"Component scope: {report['scope']}", file=stream)
+    if report.get("error"):
+        print(f"Error: {report['error']}", file=stream)
     if report.get("from"):
         print(f"Component scope: {report['from']} -> {report['to']}", file=stream)
     if report.get("impact"):

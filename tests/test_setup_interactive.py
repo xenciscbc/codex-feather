@@ -75,6 +75,15 @@ class SetupInteractiveTest(unittest.TestCase):
         self.assertIn("Maintenance guidance: missing", report)
         self.assertIn("Session loading: unconfirmed", report)
 
+    def test_human_preflight_error_identifies_scope_and_reason(self):
+        output = io.StringIO()
+        show({"action": "check", "scope": "user", "status": "error",
+              "error": "Invalid installation record", "changes": []}, stream=output)
+        report = output.getvalue()
+        self.assertIn("Component scope: user", report)
+        self.assertIn("Error: Invalid installation record", report)
+        self.assertIn("Status: error", report)
+
 
 if __name__ == "__main__":
     unittest.main()

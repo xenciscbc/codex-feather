@@ -198,7 +198,7 @@ class PluginSetupTest(unittest.TestCase):
         self.assertEqual((self.project / ".feather/handoffs/work.md").read_text(), "My handoff data\n")
         self.assertFalse((self.user_home / ".agents/skills/handoff").exists())
 
-    def install_standalone_handoff(self, entrance="none"):
+    def install_standalone_handoff(self, entrance="none", expected_code=0):
         bundle = self.directory / "legacy bundle"
         prepared = subprocess.run([sys.executable, "-B", str(self.plugin / "scripts/build_setup.py"),
                                    "--prepare-only", "--output", str(bundle)],
@@ -210,7 +210,16 @@ class PluginSetupTest(unittest.TestCase):
                    "--bundle", str(bundle), "--components", "handoff", "--entrance", entrance, "--json"]
         legacy = subprocess.run(command, cwd=self.other_cwd, capture_output=True, text=True,
                                 encoding="utf-8", timeout=45)
-        self.assertEqual(legacy.returncode, 0, legacy.stderr + legacy.stdout)
+        self.assertEqual(legacy.returncode, expected_code, legacy.stderr + legacy.stdout)
+        return legacy
+
+    def test_standalone_cli_preserves_visible_user_plugin_installation(self):
+        self.assert_success(self.run_setup("install", "--components", "handoff", "--scope", "user"))
+        before = self.target_files()
+        refused = self.install_standalone_handoff(expected_code=1)
+        self.assertIn("Plugin handoff", refused.stderr)
+        self.assertEqual(self.target_files(), before)
+        self.assertFalse((self.project / ".agents/skills/handoff").exists())
 
     def test_explicit_handoff_remove_cleans_legacy_installation_only(self):
         self.install_standalone_handoff()

@@ -6,21 +6,12 @@ from typing import Any
 
 from .bundle import Bundle, digest, validate_target
 from .environment import Environment, find_codex
-from .discovery import reuse_candidate, skill_name, unowned_handoff_paths
+from .discovery import reuse_candidate, skill_name, unowned_handoff_paths, require_standalone_handoff_scope
 from .transaction import Plan, read_regular
 from . import entrances, diagnostics
 from .conflicts import ConflictError
 from .handoff_runtime import inspect_python
-
-
-def read_state(environment: Environment, plan: Plan) -> dict:
-    saved = plan.read(environment.state_path)
-    state = json.loads(saved) if saved is not None else {"format": 1, "environment": environment.identity, "components": {}}
-    if state.get("format") != 1:
-        raise ValueError("Unsupported installation record")
-    if state.get("environment") != environment.identity:
-        raise ValueError("Installation record belongs to a different environment. Use an explicit migration; no paths were retargeted.")
-    return state
+from .state import read_state
 
 
 def plugin_provider(path: Path | None) -> dict | None:
@@ -58,8 +49,8 @@ def execute(action: str, environment: Environment, bundle: Bundle, components: l
                              else ((old.get("entrance") or {}).get("scope", "none") if old else environment.scope))
         if component == "handoff" and provider and action in {"install", "update"} and old and not old.get("provider"):
             raise ValueError("A standalone handoff installation is recorded here; remove or manage it explicitly before selecting plugin handoff")
-        if component == "handoff" and not provider and action in {"install", "update"} and old and old.get("provider"):
-            raise ValueError("Plugin handoff is recorded here; use the owning plugin to update it")
+        if component == "handoff" and not provider and action in {"install", "update"}:
+            require_standalone_handoff_scope(environment, plan)
         if component == "handoff" and provider and action in {"install", "update"} and selected_entrance == "none" and not (old or {}).get("entrance"):
             raise ValueError("Plugin handoff already supplies the skill; choose a project or user entrance to enable its guidance")
         if action == "check" and old and old.get("entrance"):
