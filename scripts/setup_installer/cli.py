@@ -17,7 +17,8 @@ from . import interactive
 from .reporting import show
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: list[str] | None = None, handoff_provider: Path | None = None,
+         default_entrance: bool = False) -> int:
     # Frozen Python ignores PYTHONUTF8; the CLI's redirected JSON must still be UTF-8 on Windows.
     for stream in (sys.stdout, sys.stderr):
         if isinstance(stream, io.TextIOWrapper):
@@ -45,7 +46,18 @@ def main(argv: list[str] | None = None) -> int:
     try:
         guided = args.action is None or args.interactive
         if guided:
-            interactive.choose(args, arguments)
+            def preflight() -> None:
+                user_home = args.user_home.resolve()
+                codex_home = args.codex_home or Path(os.environ.get("CODEX_HOME", user_home / ".codex"))
+                bundle = Bundle.read(args.bundle.resolve())
+                print("Installed state before choosing an operation:", file=sys.stderr)
+                for scope in ("project", "user"):
+                    environment = Environment(args.project.resolve(strict=True), user_home, codex_home.resolve(), scope)
+                    report = execute("check", environment, bundle, ["all"], args.codex,
+                                     handoff_provider=handoff_provider)
+                    report.pop("_plan_id")
+                    show(report, args.json, sys.stderr)
+            interactive.choose(args, arguments, preflight)
         if args.action != "migrate" and (args.source_scope is not None or args.target_scope is not None):
             raise ValueError("--from and --to belong to migrate; choose the migration operation explicitly")
         if args.action in {"check", "remove"} and args.entrance != "none":
@@ -61,10 +73,12 @@ def main(argv: list[str] | None = None) -> int:
                 if args.on_conflict == "replace":
                     raise ValueError("Migration preserves source bytes; resolve customizations with update before migrating")
                 report = migrate(environment, bundle, args.components, args.source_scope, args.target_scope,
-                                 args.codex, dry_run, args.entrance, approved_plan if not dry_run else None)
+                                 args.codex, dry_run, args.entrance, approved_plan if not dry_run else None,
+                                 handoff_provider)
             else:
                 report = execute(args.action, environment, bundle, args.components, args.codex,
-                                 dry_run, args.entrance, args.on_conflict, approved_plan if not dry_run else None)
+                                 dry_run, args.entrance, args.on_conflict, approved_plan if not dry_run else None,
+                                 handoff_provider, default_entrance)
             plan_id = report.pop("_plan_id")
             if dry_run:
                 approved_plan = plan_id

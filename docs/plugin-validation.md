@@ -1,5 +1,28 @@
 # 原生 plugin 與 setup 驗證
 
+## Setup 元件獨立管理（2026-09-23）
+
+新版來源的 plugin setup 支援分別選擇 `handoff`、`delegation` 或 `all`。Handoff 管理 plugin skill 的自動維護入口與來源紀錄；delegation 管理五角色及分派入口。所有測試在隔離專案與 home 執行，沒有更新實際全域安裝。
+
+| 驗證 | 結果 |
+| --- | --- |
+| `python -B -m unittest discover -s tests` | 258 項：255 通過、3 略過；本機紀錄 `dist/setup-components-validation/regression.log` |
+| 補充兩個 plugin 案例 | 同時安裝遇角色衝突時零變更、單獨更新 handoff 保留 delegation 檔案／紀錄／入口，均通過 |
+| mypy：安裝器、建置入口及 plugin setup | 20 個來源檔案通過；沿用既有非 strict 設定 |
+| setup skill validator、`git diff --check` | 通過 |
+
+此次驗收涵蓋 260 個測試案例，257 通過、3 略過。覆蓋單選／全選、部分移除、無重複 skill、零角色的 handoff 安裝、停用 agents 時仍可安裝 handoff、舊版來源衝突、入口位置保留、plugin 來源更新、交接資料保全及無元件檔案的 handoff 規則遷移。互動測試核對先選專案與顯示兩個範圍的狀態，再詢問操作，並保留已指定的選擇。
+
+主 Agent 完成操作指引、互動流程與整合驗收；executor 實作元件管理，analyst 唯讀檢查七種請求的操作路徑。主 Agent 核對變更範圍及 analyst 來源的完整 SHA-256，並補上一般更新保留既有 standalone 來源的指引。派工設定為 executor `gpt-6-sol/medium`、analyst `gpt-6-sol/high`，工具接受設定；服務端逐回應模型證據未取得。未重建獨立二進位包，也未驗證新指引在真實新 session 自動維護交接的行為。
+
+同日審查後另重現並修正三項問題：plugin handoff 遷移漏查來源範圍的未受管理獨立 skill；異常 handoff 路徑使查詢中止、遺失正常 delegation 結果；受管理 standalone handoff 被 plugin 查詢誤報為衝突，且未呈現其入口。三個新增測試均先確認失敗，再驗證修正成功。安裝與遷移共用本地 handoff 路徑及所有權檢查，並將讀取納入交易基準；既有 standalone 的查詢沿用其安裝紀錄與入口。
+
+Standards 審查的詞彙缺口已補入 `CONTEXT.md`，重複衝突邏輯已集中；入口預設參數的簡化建議暫不採用，保留既有呼叫介面，以重複安裝與明確 `none` 測試核對行為。Spec 審查指出的 standalone 狀態錯誤已修正。兩名 analyst 皆唯讀，主 Agent 已核對來源 SHA-256、重現與修正；實際服務端模型仍未確認。
+
+修正後重跑 `test_plugin_setup`、`test_setup`、`test_setup_interactive`、`test_upgrade_short_names`：99 項中 97 通過、2 略過，本機紀錄為 `dist/setup-components-validation/review-regression.log`。20 個來源檔案的 mypy 與差異格式檢查通過。
+
+以下保留先前版本的驗證紀錄。
+
 日期：2026-09-23。環境：Windows、Python 3.11、Codex CLI `0.155.0-alpha.16`。這次新增 plugin manifest、Git marketplace、`feather-setup` skill 與既有安裝器的來源入口；沒有修改使用者的全域安裝，也尚未發布遠端版本。
 
 ## 自動驗證

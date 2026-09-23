@@ -22,7 +22,15 @@ codex plugin add codex-feather@codex-feather
 
 Codex may display plugin-qualified skill names such as `codex-feather:handoff`; their short names are `handoff`, `setup`, `model`, `auto-on` and `auto-off`. Native child-role names have no such prefix.
 
-Start a new session and ask **“Use setup to configure Feather for this project”** or specify user scope. Setup previews and applies five custom roles and agent guidance using the existing installer; installing the plugin alone does not write them. Source setup requires Python 3.11+ and PyYAML (`requirements-setup.txt`).
+Start a new session and ask **“Use setup to configure Feather for this project”** or specify user scope. Setup first shows the project and user installation status, then asks which component to install, update, remove or migrate. Choices already stated in your request are preserved.
+
+| Selection | What gets installed |
+| --- | --- |
+| handoff | Automatic maintenance guidance using the plugin's existing skill, keeping an existing work handoff current at milestones, blockers and completion. |
+| delegation | Agent dispatch guidance and the five native role files. |
+| Both | Both components, which can also be updated, removed or scoped independently. |
+
+For example: “Use setup to install only handoff maintenance guidance for this project,” “Install delegation rules and roles in user scope, preserving handoff,” or “Install both in this project.” Installing the plugin alone does not write these external settings. Source setup requires Python 3.11+ and PyYAML (`requirements-setup.txt`).
 
 After refreshing the plugin, ask setup to update the external configuration. Before uninstalling the plugin, ask setup to remove those managed files. Existing standalone handoff skills require an explicit transition; setup does not install a duplicate. See [plugin setup and lifecycle](docs/plugin.md). Tags through `v1.0.1` do not contain this plugin packaging.
 

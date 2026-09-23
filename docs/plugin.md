@@ -1,6 +1,6 @@
 # Feather 原生 plugin
 
-Feather 的原生 plugin 包含 `handoff`、`setup`、`model`、`auto-on` 與 `auto-off`。Plugin 管理 skills 的取得與載入；setup skill 呼叫既有安裝器，管理 plugin 外部的五角色 TOML 與分工入口；model skill 引導修改角色模型與推理強度。沒有自動安裝 hook，也不會在安裝 plugin 時修改全域指引。
+Feather 的原生 plugin 包含 `handoff`、`setup`、`model`、`auto-on` 與 `auto-off`。Plugin 管理 skills 的取得與載入；setup skill 呼叫既有安裝器，分別管理 handoff 自動維護入口，以及五角色 TOML 與分工入口；model skill 引導修改角色模型與推理強度。沒有自動安裝 hook，也不會在安裝 plugin 時修改全域指引。
 
 ## 安裝與首次設定
 
@@ -11,9 +11,35 @@ codex plugin marketplace add xenciscbc/codex-feather
 codex plugin add codex-feather@codex-feather
 ```
 
-開新 session，確認五個 skills 列出，再說：「使用 setup，將 Feather 設定為全域使用」或「只設定目前專案」。LLM 會檢查既有部署，預覽並套用指定範圍的角色與入口，再執行健檢。確認角色載入仍需新 session。
+開新 session，確認五個 skills 列出，再說：「使用 setup」。LLM 先列出目前專案與使用者範圍的兩項元件狀態，包括來源、規則入口與衝突，再詢問要執行的操作、元件與範圍。只要求查詢時不會安裝。也可直接說「只在目前專案安裝 handoff 自動維護規則」、「全域安裝分派規則與 agent」或「在目前專案安裝兩者」；已指定的選擇不會重複詢問。
+
+`handoff` 管理交接自動維護入口，使用 plugin 已提供的 skill；已有工作交接時，依其規則在重要進展、受阻與完成時更新。`delegation` 同時管理五角色檔案與分派入口；`all` 表示兩者。兩項可使用不同範圍，安裝、更新、遷移與移除互不綁定。套用前列出所選範圍的預覽，套用後核對結果；確認角色與指引載入仍需新 session。
 
 Setup 的來源執行需要 Python 3.11+ 與 PyYAML；相依清單為 plugin 根目錄的 `requirements-setup.txt`。LLM 先沿用合適的 Python 環境；缺少套件時先取得安裝授權。這條路徑不要求 PyInstaller 或 mypy；既有獨立二進位安裝方式仍可使用。
+
+### 分別管理元件
+
+以下 `<setup.py>` 代表 plugin 內 `skills/setup/scripts/setup.py` 的絕對路徑。修改操作必須明確選擇 `--components handoff`、`delegation` 或 `all`；`check` 未指定時檢查兩者。新安裝未指定 `--entrance` 時，規則入口跟隨 `--scope`；更新保留原入口。Delegation 可明確用 `--entrance none` 只裝角色；plugin handoff 本身已可使用，選用 setup 的 handoff 元件則是要安裝維護入口。
+
+```powershell
+# 先檢查兩個範圍
+python '<setup.py>' check --project 'D:/work/my-project' --scope project --json
+python '<setup.py>' check --project 'D:/work/my-project' --scope user --json
+
+# 單獨安裝 handoff 規則；將 --dry-run 移除後套用
+python '<setup.py>' install --project 'D:/work/my-project' --scope project --components handoff --dry-run --json
+
+# 同時安裝兩者
+python '<setup.py>' install --project 'D:/work/my-project' --scope project --components all --dry-run --json
+
+# 單獨更新 agent 與分派規則
+python '<setup.py>' update --project 'D:/work/my-project' --scope project --components delegation --dry-run --json
+
+# 只移除 handoff 維護規則，保留分派設定與交接資料
+python '<setup.py>' remove --project 'D:/work/my-project' --scope project --components handoff --dry-run --json
+```
+
+新安裝兩者同範圍時是一筆交易；若分別選擇專案 handoff 與全域 delegation，則各自預覽與執行。Plugin handoff 的檢查會區分 skill 來源、已受管理入口及尚未確認的 session 載入；不以 plugin 檔案存在推定入口已安裝。
 
 ## 自動計畫審查
 
@@ -33,16 +59,16 @@ codex plugin marketplace upgrade codex-feather
 
 Marketplace 追蹤 Git 來源；重新載入後確認實際安裝的 plugin 版本與技能路徑。需要時從原生 plugin 管理介面重新安裝，再開新 session。不要只由 marketplace 更新成功便推定快取內容或外部設定已更新。
 
-接著說：「使用 setup，同步全域的新版角色與分工規則」。Skill 使用新 plugin 內的模板執行 `update --dry-run`，處理差異後套用；原有安裝器會更新所有權紀錄及備份。其他專案的獨立部署須在其原始專案範圍分別更新。
+接著說：「使用 setup，同步全域的新版角色與分工規則」，或明確要求同時更新 handoff 維護規則。Skill 使用新 plugin 內的模板，對所選元件執行 `update --dry-run`，處理差異後套用；原有安裝器會更新所有權紀錄及備份。兩項元件可分別更新；其他專案的獨立部署須在其原始專案範圍分別更新。
 
 共用分工入口可由已登記的角色擁有者升級封裝預設值，影響所有共用該入口的專案；預覽會列出共用入口路徑，並保留其擁有者清單。新加入或僅沿用角色的安裝不能改寫共用入口的模型表格。這與 `model` 的永久自訂不同：永久自訂仍要求單一入口擁有者，手動修改過的入口仍依衝突流程處理。
 
 ## 既有安裝與移除
 
 - 原本的四角色可由新版 setup 在原有擁有者範圍更新為五角色，不需要先刪除。
-- Plugin 已提供交接 skill，因此 setup 預設只處理 `delegation`。`handoff` 的 install/update/migrate 在 plugin 入口會被拒絕，避免再裝一份。
+- Plugin 已提供交接 skill；setup 的 `handoff` 安裝、更新與遷移管理其自動維護入口，不部署另一份 skill。修改時必須明確選擇元件。
 - 既有獨立交接 skill 保持原樣；切換至 plugin 時先確認 plugin skill 能載入，再依原安裝紀錄清理獨立副本。自訂或來源不明的檔案會保留並回報。移除共用副本會影響其他專案，需要納入使用者的切換範圍。
-- Plugin 發現交接 skill 取代舊交接入口的提示作用；delegation setup 不會另建立 handoff 的 `AGENTS.md` 區塊。
+- 切換來源後，可選擇安裝 plugin handoff 的 `AGENTS.md` 維護區塊。Delegation 單獨安裝不會建立 handoff 區塊；單獨移除 handoff 維護規則也不會移除 plugin skill。
 - 移除 Feather 時，先讓 setup 清理授權範圍內的外部角色與入口，再移除 plugin。停用或移除 plugin 本身不會執行清理工具。`.feather/handoffs/` 與歷史資料保留。
 
 ## 封裝與維護

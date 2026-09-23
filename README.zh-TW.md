@@ -22,7 +22,15 @@ codex plugin add codex-feather@codex-feather
 
 Codex 可能以 `codex-feather:handoff` 等 plugin 命名空間顯示技能；其短名稱為 `handoff`／`setup`／`model`／`auto-on`／`auto-off`，子 Agent 名稱不帶此前綴。
 
-開新 session，說「使用 setup 設定目前專案」或指定全域使用。Setup 會沿用既有安裝器，預覽並部署五角色與分工指引；單純安裝 plugin 不會寫入這些外部設定。來源 setup 需要 Python 3.11+ 與 PyYAML（`requirements-setup.txt`）。
+開新 session，說「使用 setup 設定目前專案」或指定全域使用。Setup 先列出專案與使用者範圍的安裝狀態，再詢問要安裝、更新、移除或遷移哪一項；已指明的選擇不會重複詢問。
+
+| 可選項目 | 安裝內容 |
+| --- | --- |
+| handoff | 交接自動維護規則，使用 plugin 已提供的 skill；既有工作交接會隨重要進展、受阻與完成更新。 |
+| delegation | Agent 分派規則及五個原生角色檔案。 |
+| 兩者 | 同時安裝上述兩項，也可日後分別更新、移除或選不同適用範圍。 |
+
+例如：「用 setup 只安裝目前專案的 handoff 自動維護規則」、「用 setup 全域安裝 agent 分派規則與角色，保留 handoff 現況」或「用 setup 在目前專案安裝兩者」。單純安裝 plugin 不會寫入這些外部設定。來源 setup 需要 Python 3.11+ 與 PyYAML（`requirements-setup.txt`）。
 
 更新 plugin 後，再請 setup 同步外部設定；移除 plugin 前，先讓 setup 清理受管理的角色與入口。既有獨立交接 skill 須明確選擇切換，setup 不會再安裝重複副本。詳見 [plugin 設定與生命週期](docs/plugin.md)。`v1.0.1` 及更早 tag 不含本次 plugin 封裝。
 

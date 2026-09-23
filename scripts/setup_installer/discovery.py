@@ -7,7 +7,7 @@ import yaml  # type: ignore[import-untyped]
 
 from .bundle import HANDOFF_ROOT, LEGACY_HANDOFF_ROOT, LEGACY_ROLES, ROLES
 from .environment import Environment
-from .transaction import read_regular, validate_regular
+from .transaction import Plan, read_regular, validate_regular
 
 
 def skill_name(content: bytes) -> str | None:
@@ -35,6 +35,18 @@ def skill_files(root: Path):
             seen.add(resolved)
         if "SKILL.md" in files:
             yield Path(directory) / "SKILL.md"
+
+
+def unowned_handoff_paths(environment: Environment, plan: Plan, owned: set[str] | None = None) -> list[Path]:
+    """Check canonical and legacy skill paths against this operation's ownership."""
+    paths = []
+    for target in (HANDOFF_ROOT + "SKILL.md", LEGACY_HANDOFF_ROOT + "SKILL.md"):
+        if target in (owned or set()):
+            continue
+        path = environment.target(target)
+        if plan.read(path) is not None:
+            paths.append(path)
+    return paths
 
 
 def reuse_candidate(environment: Environment, component: str, ignore: Environment | None = None,

@@ -25,7 +25,9 @@ def instruction(bundle: Bundle, component: str, overrides: dict | None = None,
         guard = ("Use this capability only when handoff or legacy feather-handoff is listed among the skills available in the "
                  "current environment. This declaration does not install the skill in other projects.")
         body = ("When the user requests a handoff or continuation of recorded work, read and follow the "
-                "available handoff skill (or feather-handoff when only that legacy skill is available). Preserve its handoff-file and history rules. "
+                "available handoff skill (or feather-handoff when only that legacy skill is available). "
+                "Once a handoff exists for the current work, maintain it at meaningful milestones, blockers, and completion "
+                "according to that skill's file and history rules. Do not create a handoff for unrelated work. "
                 "This entry grants no additional authorization to edit, delegate, or delete data.")
     return f"{guard}\n\n{body}"
 

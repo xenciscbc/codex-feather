@@ -743,6 +743,9 @@ class SetupTest(unittest.TestCase):
         # Paths and component choice are supplied; the guide asks only for operation, scope, entrance and apply.
         result = self.run_setup(None, "--components", "all", input="install\nproject\nuser\nno\n")
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertLess(result.stderr.index('"action": "check"'), result.stderr.index("Operation"))
+        self.assertIn('"scope": "project"', result.stderr[:result.stderr.index("Operation")])
+        self.assertIn('"scope": "user"', result.stderr[:result.stderr.index("Operation")])
         self.assertFalse((self.project / ".agents").exists())
         self.assertFalse((self.codex_home / "AGENTS.md").exists())
         result = self.run_setup(None, "--components", "all", input="install\nproject\nuser\nyes\n")
@@ -989,7 +992,7 @@ class SetupTest(unittest.TestCase):
         environment.update(HOME=str(self.user_home), USERPROFILE=str(self.user_home), PYTHONUTF8="1",
                            PATH=str(Path(CODEX).parent) + os.pathsep + os.environ.get("PATH", ""))
         result = subprocess.run(command, cwd=self.bundle, env=environment,
-                                input=f"install\nall\n{self.project}\nproject\nnone\nyes\n",
+                                input=f"{self.project}\ninstall\nall\nproject\nnone\nyes\n",
                                 capture_output=True, text=True, encoding="utf-8", timeout=30)
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         self.assertIn("Feather: install", result.stdout)

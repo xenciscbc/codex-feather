@@ -25,6 +25,12 @@ def show(report: dict, structured: bool = False, stream: TextIO | None = None) -
         print(f"  {name}: {detail.get('status', label)}", file=stream)
         if detail.get("message"):
             print(f"    {detail['message']}", file=stream)
+        if detail.get("provider"):
+            provider = detail["provider"]
+            print(f"    Skill provider: {provider['kind']} ({provider['source']})", file=stream)
+            print(f"    Session loading: {provider['session']}", file=stream)
+        if detail.get("guidance"):
+            print(f"    Maintenance guidance: {detail['guidance']}", file=stream)
         if detail.get("status") == "reused":
             for path in detail["paths"]:
                 print(f"    using {path}", file=stream)

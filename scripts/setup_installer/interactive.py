@@ -22,16 +22,18 @@ def ask(prompt: str, default: str, choices: list[str] | None = None) -> str:
         print("Choose one of the listed values.", file=sys.stderr)
 
 
-def choose(args: argparse.Namespace, supplied: list[str]) -> None:
+def choose(args: argparse.Namespace, supplied: list[str], preflight: Callable[[], None] | None = None) -> None:
     def missing(flag: str) -> bool:
         return not any(value == flag or value.startswith(flag + "=") for value in supplied)
 
+    if missing("--project"):
+        args.project = Path(ask("Project directory", str(args.project)))
+    if preflight is not None:
+        preflight()
     if args.action is None:
         args.action = ask("Operation", "install", ["install", "check", "update", "remove", "migrate"])
     if missing("--components"):
         args.components = [ask("Components", "all", ["all", "delegation", "handoff"])]
-    if missing("--project"):
-        args.project = Path(ask("Project directory", str(args.project)))
     if args.action == "migrate":
         if missing("--from"):
             args.source_scope = ask("Source scope", "project", ["project", "user"])
