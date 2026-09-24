@@ -90,7 +90,7 @@ python scripts/trial.py verify .scratch/feather-mvp/runs/my-scout
 
 ## 最小手動配置
 
-僅在新的隔離 home 試用：把五份 `templates/*.toml` 放入 `home/agents/`，把候選 `templates/AGENTS.md` 放入 workspace，在 home config 設定 `agents.enabled = true`。建議使用 prepare 產生含 `.feather-root` 根目錄標記的相同配置。
+僅在新的隔離 home 試用：把五份 `templates/*.toml` 放入 `home/agents/`，把候選 `templates/entrances/delegation.md` 放入 workspace，並將 `templates/feather-delegation/SKILL.md` 放入 workspace 的 `.agents/skills/feather-delegation/`；在 home config 設定 `agents.enabled = true`。建議使用 prepare 產生含 `.feather-root` 根目錄標記的相同配置。
 
 檢查同名角色、同層 `AGENTS.override.md`、專案 `.codex/agents/` 與生效指令優先順序；發現衝突使用新隔離目錄，不覆寫既有配置。角色檔若殘留 model/reasoning 會蓋過派工參數，靜態檢查將拒絕這類配置；AGENTS.md 的預設文字仍須由主 Agent 轉成原生參數，不能當作已執行證據。即時權限覆寫可能覆蓋角色 sandbox，混合可寫／唯讀情境須檢閱實際權限和副作用。
 

@@ -221,12 +221,15 @@ def retry_delay(attempt, base, cap):
             self.assertIn("exactly two failed attempts", result.stderr)
 
     def test_delegation_templates_define_return_review_and_bounded_reclaim(self):
-        agents = (ROOT / "templates/AGENTS.md").read_text(encoding="utf-8")
+        agents = (ROOT / "templates/entrances/delegation.md").read_text(encoding="utf-8")
+        skill = (ROOT / "templates/feather-delegation/SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("`feather-delegation` skill", agents)
+        self.assertLess(len(agents.split()), 450)
         for required in ["`outcome`", "Results and evidence", "Changes:", "Validation:",
                          "Blockers and next step", "does not by itself complete",
                          "Retry the same operation unchanged at most once",
                          "confirm the previous child has stopped or completed"]:
-            self.assertIn(required, agents)
+            self.assertIn(required, skill)
 
         for role in ["scout", "analyst", "mech-executor", "executor"]:
             with self.subTest(role=role):

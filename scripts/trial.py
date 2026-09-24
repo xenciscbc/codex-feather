@@ -47,7 +47,10 @@ def prepare(trial, scenario="scout"):
         if family is not handoff_trials:
             family.prepare(trial, scenario)
     else:
-        shutil.copy2(ROOT / "templates/AGENTS.md", trial / "workspace/AGENTS.md")
+        shutil.copy2(ROOT / "templates/entrances/delegation.md", trial / "workspace/AGENTS.md")
+        runtime_skill = trial / "workspace/.agents/skills/feather-delegation/SKILL.md"
+        runtime_skill.parent.mkdir(parents=True)
+        shutil.copy2(ROOT / "templates/feather-delegation/SKILL.md", runtime_skill)
     (trial / "workspace/.feather-root").touch()
     (trial / "home/config.toml").write_text('project_root_markers = [".feather-root"]\n\n[agents]\nenabled = true\n', encoding="utf-8")
     (trial / "prompt.txt").write_text(SCENARIOS[scenario]["prompt"], encoding="utf-8")

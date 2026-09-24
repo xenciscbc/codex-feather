@@ -27,7 +27,7 @@ Start a new session and ask **“Use setup to configure Feather for this project
 | Selection | What gets installed |
 | --- | --- |
 | handoff | Automatic maintenance guidance using the plugin's existing skill, keeping an existing work handoff current at milestones, blockers and completion. |
-| delegation | Agent dispatch guidance and the five native role files. |
+| delegation | Short Agent dispatch guidance, the runtime delegation skill, and five native role files. |
 | Both | Both components, which can also be updated, removed or scoped independently. |
 
 For example: “Use setup to install only handoff maintenance guidance for this project,” “Install delegation rules and roles in user scope, preserving handoff,” or “Install both in this project.” Installing the plugin alone does not write these external settings. Source setup requires Python 3.11+ and PyYAML (`requirements-setup.txt`).
@@ -58,7 +58,7 @@ User scope provides a shared installation for your local user; project scope ins
 
 Only the main agent delegates; children do not delegate further. Each child reports results, changes, validation, and blockers for the main agent to review. Writes to shared resources are serialized. If the same blocker recurs, the main agent takes the task back and preserves existing results instead of retrying it unchanged indefinitely.
 
-Model and reasoning resolve independently: applicable task setting, session override, saved setting, then packaged default. Defaults are scout `gpt-6-luna/low`, analyst `gpt-6-sol/high`, mech-executor `gpt-6-luna/medium`, executor `gpt-6-sol/medium`, and security-executor `gpt-6-sol/high`. Your main model and concurrency preferences remain unchanged. Native dispatch passes both fields; configuration and child self-report do not prove actual model use. Unavailable combinations are reported. See the [delegation rules](templates/AGENTS.md) for defaults and the full contract.
+Model and reasoning resolve independently: applicable task setting, session override, saved setting, then packaged default. Defaults are scout `gpt-6-luna/low`, analyst `gpt-6-sol/high`, mech-executor `gpt-6-luna/medium`, executor `gpt-6-sol/medium`, and security-executor `gpt-6-sol/high`. Your main model and concurrency preferences remain unchanged. Native dispatch passes both fields; configuration and child self-report do not prove actual model use. Unavailable combinations are reported. See the [short entrance](templates/entrances/delegation.md) for defaults and the [delegation skill](templates/feather-delegation/SKILL.md) for the full contract.
 
 ### Change role models
 
@@ -121,7 +121,7 @@ Some detailed guides are currently available in Traditional Chinese.
 - [Installation, updates, and removal](docs/setup.md)
 - [Handoffs, history search, and sealing](docs/handoff.md)
 - [Source baselines and verification records](skills/handoff/references/snapshots.md)
-- [Delegation rules](templates/AGENTS.md)
+- [Delegation entrance](templates/entrances/delegation.md) and [runtime skill](templates/feather-delegation/SKILL.md)
 - [Development and validation](docs/development.md)
 - [Handoff tool validation](docs/handoff-tool-validation.md)
 - [Resume reliability validation and limitations](docs/resume-reliability-validation.md)

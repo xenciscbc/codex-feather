@@ -2,7 +2,7 @@
 
 原生 plugin 使用者請先看 [plugin 設定流程](plugin.md)：plugin 提供五個 skills，其中 `setup` 使用相同安裝器分別管理交接維護入口、外部角色與分工入口。以下是獨立離線包的完整操作說明；獨立包的 handoff 會部署 skill，plugin setup 的 handoff 則使用 plugin skill，只部署維護入口。
 
-獨立 `feather-setup` 以完整離線包安裝、檢查、更新、移除或遷移 Feather。可選 `delegation`（五角色）及 `handoff`（交接 skill），`all` 表示整套。安裝器不安裝 Codex、不登入帳號，也不在安裝途中下載元件。
+獨立 `feather-setup` 以完整離線包安裝、檢查、更新、移除或遷移 Feather。可選 `delegation`（五角色與執行時 skill）及 `handoff`（交接 skill），`all` 表示整套。安裝器不安裝 Codex、不登入帳號，也不在安裝途中下載元件。
 
 ## 取得與啟動
 
@@ -54,6 +54,7 @@ Windows 直接執行 `feather-setup.exe`；Linux 在解壓資料夾執行 `./fea
 | 內容 | 專案範圍 | 使用者範圍 |
 | --- | --- | --- |
 | 五角色 | `<project>/.codex/agents/` | `<codex-home>/agents/` |
+| delegation 執行時 skill | `<project>/.agents/skills/feather-delegation/` | `<user-home>/.agents/skills/feather-delegation/` |
 | handoff | `<project>/.agents/skills/handoff/` | `<user-home>/.agents/skills/handoff/` |
 | 入口指引 | `<project>/AGENTS.override.md` 或 `AGENTS.md` | `<codex-home>/AGENTS.override.md` 或 `AGENTS.md` |
 | 元件安裝紀錄 | `<project>/.feather/setup/state.json` | `<codex-home>/feather-setup/state.json` |
@@ -64,6 +65,8 @@ Windows 直接執行 `feather-setup.exe`；Linux 在解壓資料夾執行 `./fea
 Windows 原生 Codex 使用 OS 使用者 profile 發現使用者 skills；覆寫 `HOME`／`USERPROFILE` 或傳入 `--user-home`，不會把該次原生 Codex 切換到另一個 OS profile。`--user-home` 可準備指定目錄，實際使用仍須以對應的 OS 使用者執行。Windows 與 WSL 是不同環境；WSL 應使用 Linux 發行包、Linux Codex 與 Linux home。
 
 入口優先加入同目錄既有 `AGENTS.override.md`，否則用 `AGENTS.md`。安裝器只管理 `<!-- feather-setup:<component>:begin -->` 與 `end` 標記及紀錄中的相應區塊，保留其他文字、BOM 與換行。不加入口時不修改 Agent 指引。既有入口若需要改範圍，先移除該選用元件及其入口，再以新選項安裝；元件遷移也可明確指定入口範圍。
+
+入口文字分別來自 `templates/entrances/handoff.md` 與 `templates/entrances/delegation.md`。分工入口保留能力條件、skill 觸發條件、審查模式與角色模型表；分工流程與模型解析規則由 `templates/feather-delegation/SKILL.md` 維護。模型與審查模式仍由既有設定工具更新入口。
 
 入口包含能力可用條件：使用者入口搭配專案元件時，不會要求其他沒有該元件的專案使用不存在的角色或 skill。多個安裝共用相同使用者入口時，移除單一安裝只解除自己的參照，最後一個參照解除後才移除區塊。
 

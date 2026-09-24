@@ -1,6 +1,6 @@
 # Feather 原生 plugin
 
-Feather 的原生 plugin 包含 `handoff`、`setup`、`model`、`auto-on` 與 `auto-off`。Plugin 管理 skills 的取得與載入；setup skill 呼叫既有安裝器，分別管理 handoff 自動維護入口，以及五角色 TOML 與分工入口；model skill 引導修改角色模型與推理強度。沒有自動安裝 hook，也不會在安裝 plugin 時修改全域指引。
+Feather 的原生 plugin 包含 `handoff`、`setup`、`model`、`auto-on` 與 `auto-off`。Plugin 管理這些 skills 的取得與載入；setup skill 呼叫既有安裝器，分別管理 handoff 自動維護入口，以及五角色 TOML、delegation 執行時 skill 與精簡分工入口；model skill 引導修改角色模型與推理強度。沒有自動安裝 hook，也不會在安裝 plugin 時修改全域指引。
 
 ## 安裝與首次設定
 
@@ -13,7 +13,7 @@ codex plugin add codex-feather@codex-feather
 
 開新 session，確認五個 skills 列出，再說：「使用 setup」。LLM 先列出目前專案與使用者範圍的兩項元件狀態，包括來源、規則入口與衝突，再詢問要執行的操作、元件與範圍。只要求查詢時不會安裝。也可直接說「只在目前專案安裝 handoff 自動維護規則」、「全域安裝分派規則與 agent」或「在目前專案安裝兩者」；已指定的選擇不會重複詢問。
 
-`handoff` 管理交接自動維護入口，使用 plugin 已提供的 skill；已有工作交接時，依其規則在重要進展、受阻與完成時更新。`delegation` 同時管理五角色檔案與分派入口；`all` 表示兩者。兩項可使用不同範圍，安裝、更新、遷移與移除互不綁定。套用前列出所選範圍的預覽，套用後核對結果；確認角色與指引載入仍需新 session。
+`handoff` 管理交接自動維護入口，使用 plugin 已提供的 skill；已有工作交接時，依其規則在重要進展、受阻與完成時更新。`delegation` 同時管理五角色檔案、執行時 skill 與分派入口；`all` 表示兩者。兩項可使用不同範圍，安裝、更新、遷移與移除互不綁定。套用前列出所選範圍的預覽，套用後核對結果；確認角色、skill 與指引載入仍需新 session。
 
 Setup 的來源執行需要 Python 3.11+ 與 PyYAML；相依清單為 plugin 根目錄的 `requirements-setup.txt`。LLM 先沿用合適的 Python 環境；缺少套件時先取得安裝授權。這條路徑不要求 PyInstaller 或 mypy；既有獨立二進位安裝方式仍可使用。
 

@@ -27,7 +27,7 @@ except ValueError as error:
     print(json.dumps({"error": str(error)}, ensure_ascii=False))
     raise SystemExit(1)
 try:
-    from setup_installer.bundle import ROLES, digest  # noqa: E402
+    from setup_installer.bundle import DELEGATION_SKILL, ROLES, digest  # noqa: E402
     from setup_installer.discovery import reuse_candidate  # noqa: E402
     from setup_installer.environment import Environment  # noqa: E402
     from setup_installer.installer import read_state  # noqa: E402
@@ -55,7 +55,8 @@ def _owner(environment: Environment, plan: Plan):
         targets = [candidate.target(f".codex/agents/{role}.toml") for role in ROLES]
         present = [path for path in targets if plan.read(path) is not None]
         if record and not record.get("reused"):
-            if set(record.get("files", {})) != {f".codex/agents/{role}.toml" for role in ROLES}:
+            role_files = {f".codex/agents/{role}.toml" for role in ROLES}
+            if set(record.get("files", {})) not in (role_files, role_files | {DELEGATION_SKILL}):
                 raise ValueError(f"Incomplete managed delegation ownership: {candidate.state_path}")
             for role, path in zip(ROLES, targets):
                 current = plan.read(path)
@@ -64,6 +65,11 @@ def _owner(environment: Environment, plan: Plan):
                 native = tomllib.loads(current.decode("utf-8-sig"))
                 if "model" in native or "model_reasoning_effort" in native:
                     raise ValueError(f"Native role binding overrides Feather dispatch defaults: {path}; update the managed role installation first")
+            if DELEGATION_SKILL in record["files"]:
+                skill = candidate.target(DELEGATION_SKILL)
+                content = plan.read(skill)
+                if content is None or digest(content) != record["files"][DELEGATION_SKILL]:
+                    raise ValueError(f"Managed delegation skill changed or disappeared: {skill}; resolve with setup before changing defaults")
             owned.append((candidate, state, record))
         elif present:
             raise ValueError(f"Visible delegation roles are unmanaged or reused without a verified owner: {present[0]}; resolve the installation scope first")
@@ -126,7 +132,7 @@ def run(action: str, environment: Environment, raw: list[str], expected_plan: st
                 if current[role][field] != override:
                     raise ValueError(f"Managed role table and ownership state disagree for {role}.{field}; resolve with setup")
     else:
-        current = values((SOURCE_ROOT / "templates/AGENTS.md").read_text(encoding="utf-8-sig"))
+        current = values((SOURCE_ROOT / "templates/entrances/delegation.md").read_text(encoding="utf-8-sig"))
     owner_info: dict = {"scope": owner.scope, "state_path": str(owner.state_path),
                   "entrance": {"status": "installed", "path": str(target)} if entrance else {"status": "missing", "path": None}}
     report: dict = {"action": action, "owner": owner_info, "roles": current,

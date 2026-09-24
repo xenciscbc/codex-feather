@@ -10,6 +10,7 @@ ROLES = ("scout", "analyst", "mech-executor", "executor", "security-executor")
 LEGACY_ROLES = ROLES[:-1]
 HANDOFF_ROOT = ".agents/skills/handoff/"
 LEGACY_HANDOFF_ROOT = ".agents/skills/feather-handoff/"
+DELEGATION_SKILL = ".agents/skills/feather-delegation/SKILL.md"
 
 
 def digest(content: bytes) -> str:
@@ -50,6 +51,8 @@ class Bundle:
         if not isinstance(components, dict) or not components:
             raise ValueError("Bundle has no components")
         for name, component in components.items():
+            if f"assets/templates/entrances/{name}.md" not in payload:
+                raise ValueError(f"Incomplete {name} payload: entrance template is required")
             targets = list(component["files"].values())
             if len({target.casefold() for target in targets}) != len(targets):
                 raise ValueError(f"Duplicate payload targets in {name}")
@@ -57,15 +60,19 @@ class Bundle:
                 if HANDOFF_ROOT + "SKILL.md" not in targets:
                     raise ValueError("Incomplete handoff payload: SKILL.md is required")
             elif name == "delegation":
-                if set(targets) != {f".codex/agents/{role}.toml" for role in ROLES} or "assets/templates/AGENTS.md" not in payload:
-                    raise ValueError("Incomplete delegation payload: all five roles and their guidance are required")
+                required = {f".codex/agents/{role}.toml" for role in ROLES} | {DELEGATION_SKILL}
+                if set(targets) != required or "assets/templates/entrances/delegation.md" not in payload:
+                    raise ValueError("Incomplete delegation payload: all five roles, runtime skill and guidance are required")
             else:
                 raise ValueError(f"Unknown bundle component: {name}")
             for source, target in component["files"].items():
                 if source not in manifest["files"]:
                     raise ValueError(f"Unverified payload: {source}")
                 validate_target(name, target, bundled=True)
-                if name == "delegation":
+                if name == "delegation" and target == DELEGATION_SKILL:
+                    if not payload[source].startswith(b"---\nname: feather-delegation\n"):
+                        raise ValueError(f"Invalid delegation runtime skill: {source}")
+                if name == "delegation" and target != DELEGATION_SKILL:
                     role = tomllib.loads(payload[source].decode("utf-8-sig"))
                     if role.get("name") != Path(target).stem or not role.get("description") or not role.get("developer_instructions"):
                         raise ValueError(f"Invalid native role payload: {source}")
@@ -81,6 +88,6 @@ def validate_target(component: str, target: str, *, bundled: bool = False) -> No
     if component == "handoff" and (target.startswith(HANDOFF_ROOT)
                                    or (not bundled and target.startswith(LEGACY_HANDOFF_ROOT))):
         return
-    if component == "delegation" and target in {f".codex/agents/{name}.toml" for name in ROLES}:
+    if component == "delegation" and target in ({f".codex/agents/{name}.toml" for name in ROLES} | {DELEGATION_SKILL}):
         return
     raise ValueError(f"Unexpected {component} destination: {target}")

@@ -3,7 +3,7 @@ import json
 import re
 
 from . import entrances
-from .bundle import ROLES, digest
+from .bundle import DELEGATION_SKILL, ROLES, digest
 from .discovery import reuse_candidate
 from .environment import Environment
 from .state import read_state
@@ -48,8 +48,8 @@ def run(action: str, environment: Environment, mode: str | None = None,
         if not reused:
             raise ValueError("Reused role installation is missing; repair with setup")
     else:
-        expected = {f".codex/agents/{role}.toml" for role in ROLES}
-        if set(record.get("files", {})) != expected:
+        role_files = {f".codex/agents/{role}.toml" for role in ROLES}
+        if set(record.get("files", {})) not in (role_files, role_files | {DELEGATION_SKILL}):
             raise ValueError("Role installation needs a setup update before changing review policy")
         for target, checksum in record["files"].items():
             content = plan.read(environment.target(target))

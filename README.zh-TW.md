@@ -27,7 +27,7 @@ Codex 可能以 `codex-feather:handoff` 等 plugin 命名空間顯示技能；�
 | 可選項目 | 安裝內容 |
 | --- | --- |
 | handoff | 交接自動維護規則，使用 plugin 已提供的 skill；既有工作交接會隨重要進展、受阻與完成更新。 |
-| delegation | Agent 分派規則及五個原生角色檔案。 |
+| delegation | 精簡 Agent 分派入口、執行時 skill 及五個原生角色檔案。 |
 | 兩者 | 同時安裝上述兩項，也可日後分別更新、移除或選不同適用範圍。 |
 
 例如：「用 setup 只安裝目前專案的 handoff 自動維護規則」、「用 setup 全域安裝 agent 分派規則與角色，保留 handoff 現況」或「用 setup 在目前專案安裝兩者」。單純安裝 plugin 不會寫入這些外部設定。來源 setup 需要 Python 3.11+ 與 PyYAML（`requirements-setup.txt`）。
@@ -58,7 +58,7 @@ Codex 可能以 `codex-feather:handoff` 等 plugin 命名空間顯示技能；�
 
 只有主 Agent 派工，子 Agent 不再向下委派。每個子任務回報成果、變更、驗證與阻礙，由主 Agent 驗收；共享寫入依序處理。同一原因再次阻塞時收回處理，保留已有成果，避免原樣無限重試。
 
-模型與 reasoning 各自依適用任務指定、session 覆寫、已保存設定、封裝預設決定。五角色預設為 scout `gpt-6-luna/low`、analyst `gpt-6-sol/high`、mech-executor `gpt-6-luna/medium`、executor `gpt-6-sol/medium`、security-executor `gpt-6-sol/high`。主模型與並行偏好不變。原生派工傳入兩欄；設定或子 Agent 自述不能證明實際模型。預設值與完整規則見 [分工規則](templates/AGENTS.md)。
+模型與 reasoning 各自依適用任務指定、session 覆寫、已保存設定、封裝預設決定。五角色預設為 scout `gpt-6-luna/low`、analyst `gpt-6-sol/high`、mech-executor `gpt-6-luna/medium`、executor `gpt-6-sol/medium`、security-executor `gpt-6-sol/high`。主模型與並行偏好不變。原生派工傳入兩欄；設定或子 Agent 自述不能證明實際模型。預設值見[精簡入口](templates/entrances/delegation.md)，完整規則見[執行時 skill](templates/feather-delegation/SKILL.md)。
 
 ### 修改角色模型
 
@@ -119,7 +119,7 @@ Auto 模式只在重大安全邊界變更、資料遷移、不可逆操作或複
 - [安裝、更新與移除](docs/setup.md)
 - [交接、搜尋歷史與封存](docs/handoff.md)
 - [來源基準與驗證紀錄](skills/handoff/references/snapshots.md)
-- [分工規則](templates/AGENTS.md)
+- [分工入口](templates/entrances/delegation.md)與[執行時 skill](templates/feather-delegation/SKILL.md)
 - [開發與驗收](docs/development.md)
 - [交接工具驗收紀錄](docs/handoff-tool-validation.md)
 - [接續可靠性驗證與限制](docs/resume-reliability-validation.md)

@@ -1,3 +1,8 @@
+---
+name: feather-delegation
+description: "Read before Feather child-agent delegation or independent plan review. Covers role choice, native model dispatch, ownership, evidence, and bounded review."
+---
+
 # Feather delegation
 
 The main Agent owns task understanding, delegation, integration, and final decisions.
@@ -10,22 +15,11 @@ Use mech-executor for repetitive edits with a complete specification. Use execut
 Use security-executor for authorized implementation that changes a security boundary, such as authorization, secret handling, cryptography or trust boundaries. Give it a bounded contract and concrete security evidence. Security analysis and independent plan review belong to analyst.
 For a worthwhile independent responsibility outside these roles, use a native generic child.
 
-Automatic plan review mode: off
-This is a saved default, not a hook or an authorization gate. An explicit request to review a plan applies in either mode. In auto mode, require independent review before implementing a plan with a material security-boundary change, data migration, irreversible operation or complex cross-module change. Multiple files alone do not trigger review; judge material scope and risk. Small or routine tasks proceed directly.
+The automatic plan review mode is set in the managed `AGENTS.md` entrance. The packaged default is off; an explicit request to review a plan applies in either mode. In auto mode, require independent review before implementing a plan with a material security-boundary change, data migration, irreversible operation or complex cross-module change. Multiple files alone do not trigger review; judge material scope and risk. Small or routine tasks proceed directly.
 
 For a stable logical plan, ask an analyst in a fresh native context (`fork_turns=none` or a supported equivalent). If fresh context is unavailable, report that limitation before dispatch; do not claim independent review. Give a bounded brief stating the outcome, scope and non-goals, ownership, dependencies, acceptance checks, and rollback where relevant. Its response is READY or REVISE with evidence and closure checks. Style preferences and speculative improvements are non-blocking advice. READY lets the main Agent continue work already authorized by the user; it does not grant new authorization. On REVISE, resolve every material blocker before submitting a materially revised plan for at most one further automatic review; never resubmit an unchanged plan. A failed call, protocol failure, missing verdict or exhausted budget never implies READY. After the second automatic call, unresolved blockers stop that plan's dependent implementation while independent authorized work can continue; obtaining a further review requires an explicit user request. The limit is two automatic calls total per logical plan, including failed or interrupted calls. Preserve the plan identity, call count, verdicts and unresolved blockers in an existing active handoff when one exists. Changing sessions, models, reviewers, modes, names or cosmetically splitting the plan never resets this count. If prior review-count evidence is unavailable, reconstruct it from the task and existing handoff or report it unknown; never assume a fresh budget. Do not create a handoff solely for review bookkeeping. These are agent instructions, not runtime enforcement.
 
-Role defaults for dispatch (model / reasoning):
-
-| Role | Model | Reasoning |
-| --- | --- | --- |
-| scout | gpt-6-luna | low |
-| analyst | gpt-6-sol | high |
-| mech-executor | gpt-6-luna | medium |
-| executor | gpt-6-sol | medium |
-| security-executor | gpt-6-sol | high |
-
-Resolve model and reasoning independently before delegation: an explicit task setting applicable to that child takes precedence over a session override, then an applicable saved setting, then this packaged role default. A setting scoped only to the main Agent does not override child role defaults. A generic child inherits the parent for unspecified fields. Preserve role responsibilities and permissions when applying overrides.
+Resolve model and reasoning independently before delegation: an explicit task setting applicable to that child takes precedence over a session override, then an applicable saved setting, then the packaged role default in the managed `AGENTS.md` entrance. A setting scoped only to the main Agent does not override child role defaults. A generic child inherits the parent for unspecified fields. Preserve role responsibilities and permissions when applying overrides.
 For each named role, always pass both independently resolved fields explicitly through the native spawn parameters, even when both came from this table. Role TOML files define behavior and permissions and intentionally omit model and model_reasoning_effort: those keys would override spawn values. A model-only request retains the separately resolved reasoning value, including an applicable session or saved override; an effort-only request retains the separately resolved model.
 Keep the named role in the native call. When the tool rejects overrides with full-history inheritance (such as fork_turns=all), use its supported limited-context mode (such as fork_turns=none) and supply the necessary context in the brief. Do not drop the resolved fields to retain full-history inheritance. If the loaded role still advertises immutable model settings, report a stale or conflicting configuration; updated role files require a fresh session.
 Apply resolved settings through native configuration or supported call parameters; prompt text alone is not a model binding. Use the native context-inheritance mode compatible with explicit overrides. With no overrides, request generic-child inheritance by omitting model and reasoning parameters and using full context inheritance where required. If the requested combination or inheritance cannot be applied or established, report the limitation before dispatch instead of silently substituting settings.

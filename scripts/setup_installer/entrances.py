@@ -10,26 +10,15 @@ from .conflicts import ConflictError
 
 def instruction(bundle: Bundle, component: str, overrides: dict | None = None,
                 review_mode: str | None = None) -> str:
+    body = bundle.payload[f"assets/templates/entrances/{component}.md"].decode("utf-8-sig").strip()
     if component == "delegation":
-        body = bundle.payload["assets/templates/AGENTS.md"].decode("utf-8-sig").strip()
         if overrides:
             from .model_settings import render
             body = render(body, overrides)
         if review_mode is not None:
             from .review_settings import render_mode
             body = render_mode(body, review_mode)
-        guard = ("Apply this delegation guidance only when scout, analyst, mech-executor, executor and security-executor "
-                 "are available in the current environment. If unavailable, report the missing capability "
-                 "and keep the work with the main Agent. This declaration does not install or enable roles.")
-    else:
-        guard = ("Use this capability only when handoff or legacy feather-handoff is listed among the skills available in the "
-                 "current environment. This declaration does not install the skill in other projects.")
-        body = ("When the user requests a handoff or continuation of recorded work, read and follow the "
-                "available handoff skill (or feather-handoff when only that legacy skill is available). "
-                "Once a handoff exists for the current work, maintain it at meaningful milestones, blockers, and completion "
-                "according to that skill's file and history rules. Do not create a handoff for unrelated work. "
-                "This entry grants no additional authorization to edit, delegate, or delete data.")
-    return f"{guard}\n\n{body}"
+    return body
 
 
 def location(environment: Environment, scope: str) -> dict[str, str]:

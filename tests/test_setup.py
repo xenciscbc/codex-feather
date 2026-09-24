@@ -48,6 +48,7 @@ class SetupTest(unittest.TestCase):
         skill = self.bundle / "assets/skills/handoff/SKILL.md"
         skill.parent.mkdir(parents=True)
         shutil.copyfile(ROOT / "skills/handoff/SKILL.md", skill)
+        shutil.copytree(ROOT / "templates/entrances", self.bundle / "assets/templates/entrances")
         self.write_manifest()
 
     def write_manifest(self, version="0.1.0"):
@@ -59,8 +60,9 @@ class SetupTest(unittest.TestCase):
                 source: source.replace("assets/skills/", ".agents/skills/", 1)
                 for source in files if source.startswith("assets/skills/")}},
                 **({"delegation": {"files": {
-                    source: ".codex/agents/" + Path(source).name
-                    for source in files if source.startswith("assets/templates/") and source.endswith(".toml")}}}
+                    **{source: ".codex/agents/" + Path(source).name
+                       for source in files if source.startswith("assets/templates/") and source.endswith(".toml")},
+                    "assets/templates/feather-delegation/SKILL.md": ".agents/skills/feather-delegation/SKILL.md"}}}
                    if any(source.endswith(".toml") for source in files) else {})},
         }), encoding="utf-8")
 
@@ -69,8 +71,31 @@ class SetupTest(unittest.TestCase):
         templates.mkdir(parents=True, exist_ok=True)
         for source in (ROOT / "templates").glob("*.toml"):
             shutil.copyfile(source, templates / source.name)
-        shutil.copyfile(ROOT / "templates/AGENTS.md", templates / "AGENTS.md")
+        shutil.copytree(ROOT / "templates/feather-delegation", templates / "feather-delegation")
         self.write_manifest()
+
+    def test_handoff_update_uses_bundled_template_and_preserves_other_guidance(self):
+        target = self.project / "AGENTS.md"
+        target.write_text("Project instructions\n", encoding="utf-8")
+        result = self.run_setup("install", "--components", "handoff", "--entrance", "project")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        template = self.bundle / "assets/templates/entrances/handoff.md"
+        template.write_text(template.read_text(encoding="utf-8") + "\nUpdated handoff guidance.\n", encoding="utf-8")
+        self.write_manifest()
+        result = self.run_setup("update", "--components", "handoff")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(target.read_text(encoding="utf-8").startswith("Project instructions\n"))
+        self.assertIn("Updated handoff guidance.", target.read_text(encoding="utf-8"))
+        self.assertEqual(target.read_text().count("feather-setup:handoff:begin"), 1)
+
+    def test_missing_handoff_template_rejects_install_without_writes(self):
+        (self.bundle / "assets/templates/entrances/handoff.md").unlink()
+        self.write_manifest()
+        result = self.run_setup("install", "--components", "handoff", "--entrance", "project")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("entrance template is required", result.stderr)
+        self.assertFalse((self.project / "AGENTS.md").exists())
+        self.assertFalse((self.project / ".agents").exists())
 
     def run_setup(self, action, *arguments, codex=CODEX, input=None, environment=None, fail_replace=(), fail_unlink=(), pause_replace=None, edit_after_read=None):
         executable = os.environ.get("FEATHER_TEST_INSTALLER")
@@ -257,6 +282,8 @@ class SetupTest(unittest.TestCase):
         for role in ["scout", "analyst", "mech-executor", "executor", "security-executor"]:
             self.assertEqual((self.project / f".codex/agents/{role}.toml").read_bytes(),
                              (ROOT / f"templates/{role}.toml").read_bytes())
+        self.assertEqual((self.project / ".agents/skills/feather-delegation/SKILL.md").read_bytes(),
+                         (ROOT / "templates/feather-delegation/SKILL.md").read_bytes())
         self.assertFalse((self.project / ".agents/skills/handoff").exists())
         self.assertFalse((self.project / "AGENTS.md").exists())
 
@@ -373,7 +400,7 @@ class SetupTest(unittest.TestCase):
         installed = override.read_bytes()
         self.assertTrue(installed.startswith(original))
         self.assertIn(b"handoff", installed)
-        self.assertIn(b"only the main Agent may delegate", installed)
+        self.assertIn(b"`feather-delegation` skill", installed)
         self.assertEqual(ordinary.read_bytes(), b"ordinary instructions\r\n")
         result = self.run_setup("install", "--components", "all", "--entrance", "project")
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -454,7 +481,7 @@ class SetupTest(unittest.TestCase):
         original_skill = skill.read_bytes()
         role = self.bundle / "assets/templates/analyst.toml"
         role.write_bytes(role.read_bytes() + b"\n# new release\n")
-        guidance = self.bundle / "assets/templates/AGENTS.md"
+        guidance = self.bundle / "assets/templates/entrances/delegation.md"
         guidance.write_bytes(guidance.read_bytes() + b"\nNew release guidance.\n")
         self.write_manifest("0.2.0")
         preview = self.run_setup("update", "--components", "delegation", "--dry-run")
@@ -539,7 +566,7 @@ class SetupTest(unittest.TestCase):
         text = role.read_text(encoding="utf-8")
         text = text.replace('description = "', 'description = "FeatherUpdateProbe ' , 1)
         role.write_text(text, encoding="utf-8")
-        guidance = self.bundle / "assets/templates/AGENTS.md"
+        guidance = self.bundle / "assets/templates/entrances/delegation.md"
         guidance.write_bytes(guidance.read_bytes() + b"\nFeatherUpdateEntryProbe.\n")
         self.write_manifest("0.2.0")
         result = self.run_setup("update", "--scope", "user", "--components", "delegation")

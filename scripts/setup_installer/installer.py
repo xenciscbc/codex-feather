@@ -4,7 +4,7 @@ import base64
 from pathlib import Path
 from typing import Any
 
-from .bundle import Bundle, digest, validate_target
+from .bundle import Bundle, DELEGATION_SKILL, digest, validate_target
 from .environment import Environment, find_codex
 from .discovery import reuse_candidate, skill_name, unowned_handoff_paths, require_standalone_handoff_scope
 from .transaction import Plan, read_regular
@@ -69,6 +69,12 @@ def execute(action: str, environment: Environment, bundle: Bundle, components: l
             report["components"][component] = {"status": "conflict", "message": str(error), "paths": [str(path) for path in collisions]}
             continue
         if existing:
+            if component == "delegation" and DELEGATION_SKILL in bundle.files("delegation"):
+                source = (environment.user_home / DELEGATION_SKILL if existing["scope"] == "user"
+                          else Path(existing["project"]) / DELEGATION_SKILL)
+                existing["paths"].append(str(source))
+                if action == "install" and selected_entrance != "none" and skill_name(read_regular(source) or b"") != "feather-delegation":
+                    raise ValueError(f"Reused delegation roles lack the runtime skill at {source}; update the owning scope before attaching new guidance")
             if component == "handoff" and provider and action in {"install", "update"}:
                 raise ValueError(f"A standalone handoff skill is visible from {existing['scope']} scope; preserve its owning installation")
             if component == "handoff" and provider and old and old.get("provider") and action == "check":

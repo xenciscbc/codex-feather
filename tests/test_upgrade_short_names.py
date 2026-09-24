@@ -41,7 +41,8 @@ class ShortNameUpgradeTests(unittest.TestCase):
     def make_bundle(self):
         files = {"assets/skills/handoff/SKILL.md": ".agents/skills/handoff/SKILL.md"}
         payload = {"assets/skills/handoff/SKILL.md": self.new_skill,
-                   "assets/templates/AGENTS.md": b"Role guidance"}
+                   "assets/templates/entrances/delegation.md": b"Role guidance",
+                   "assets/templates/entrances/handoff.md": (ROOT / "templates/entrances/handoff.md").read_bytes()}
         roles = {}
         for role in ROLES:
             source = f"assets/templates/{role}.toml"
@@ -111,7 +112,7 @@ class ShortNameUpgradeTests(unittest.TestCase):
         self.assertTrue(guidance.startswith(outside[0]))
         self.assertTrue(guidance.endswith(outside[1]))
         self.assertEqual(guidance.count(b"feather-setup:handoff:begin"), 1)
-        self.assertIn(b"when handoff or legacy feather-handoff is listed", guidance)
+        self.assertIn(b"When the current work already has a handoff", guidance)
         self.assertIn(b"available handoff skill", guidance)
         self.assertNotIn(b"when feather-handoff is listed", guidance)
         self.assertEqual(history.read_bytes(), b"completed handoff\r\ncustom history bytes\n")
@@ -195,7 +196,7 @@ class ShortNameUpgradeTests(unittest.TestCase):
         execute("remove", user, self.bundle, ["handoff"], None)
         self.assertFalse(user.target(old).exists())
 
-    def test_legacy_migration_entrance_matches_skill_identity(self):
+    def test_legacy_migration_refreshes_entrance_and_preserves_skill_and_history(self):
         old = ".agents/skills/feather-handoff/SKILL.md"
         link, outside = self.legacy_entrance()
         self.record("handoff", {old: self.old_skill}, entrance=link)
@@ -207,8 +208,9 @@ class ShortNameUpgradeTests(unittest.TestCase):
         self.assertEqual(user.target(old).read_bytes(), self.old_skill)
         self.assertFalse(user.target(".agents/skills/handoff/SKILL.md").exists())
         guidance = (self.home / ".codex/AGENTS.md").read_bytes()
-        self.assertIn(b"handoff or legacy feather-handoff is listed", guidance)
-        self.assertIn(b"or feather-handoff when only that legacy skill is available", guidance)
+        self.assertIn(b"available handoff skill", guidance)
+        self.assertIn(b"When the current work already has a handoff", guidance)
+        self.assertNotIn(b"feather-handoff", guidance)
         self.assertEqual((self.project / "AGENTS.md").read_bytes(), outside[0] + outside[1])
         self.assertEqual(history.read_bytes(), b"history is project data\n")
 

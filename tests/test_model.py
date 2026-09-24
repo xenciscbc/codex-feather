@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT / "skills/model/scripts"))
 
-from setup_installer.bundle import Bundle, ROLES
+from setup_installer.bundle import Bundle, DELEGATION_SKILL, ROLES
 from setup_installer.environment import Environment
 from setup_installer.installer import execute
 from setup_installer.migration import migrate
@@ -32,7 +32,7 @@ class ModelTests(unittest.TestCase):
         self.user_home.mkdir()
         self.codex_home = self.user_home / ".codex"
         self.env = Environment(self.project, self.user_home, self.codex_home)
-        payload = {"assets/templates/AGENTS.md": (ROOT / "templates/AGENTS.md").read_bytes()}
+        payload = {"assets/templates/entrances/delegation.md": (ROOT / "templates/entrances/delegation.md").read_bytes()}
         files = {}
         for role in ROLES:
             source = f"assets/templates/{role}.toml"
@@ -59,7 +59,7 @@ class ModelTests(unittest.TestCase):
     def test_show_and_partial_field_update_survive_reinstall_and_update(self):
         self.install()
         shown = run("show", self.env, [])
-        self.assertEqual(shown["roles"], values((ROOT / "templates/AGENTS.md").read_text(encoding="utf-8")))
+        self.assertEqual(shown["roles"], values((ROOT / "templates/entrances/delegation.md").read_text(encoding="utf-8")))
         self.assertEqual(shown["owner"]["scope"], "project")
         self.apply("scout.model=other-model")
         self.assertEqual(run("show", self.env, [])["roles"]["scout"],
@@ -72,13 +72,38 @@ class ModelTests(unittest.TestCase):
                          {"scout": {"model": "other-model"}})
         self.assertNotIn(b"model =", (self.project / ".codex/agents/scout.toml").read_bytes())
 
+    def test_update_adds_runtime_skill_to_legacy_role_installation(self):
+        self.install()
+        self.apply("scout.model=other-model")
+        source = "assets/templates/feather-delegation/SKILL.md"
+        self.bundle.payload[source] = (ROOT / "templates/feather-delegation/SKILL.md").read_bytes()
+        self.bundle.components["delegation"]["files"][source] = DELEGATION_SKILL
+        execute("update", self.env, self.bundle, ["delegation"], None)
+        self.assertEqual((self.project / DELEGATION_SKILL).read_bytes(), self.bundle.payload[source])
+        self.assertEqual(run("show", self.env, [])["roles"]["scout"]["model"], "other-model")
+
+    def test_reused_legacy_roles_require_skill_before_new_entrance(self):
+        self.install("user", "user")
+        source = "assets/templates/feather-delegation/SKILL.md"
+        self.bundle.payload[source] = (ROOT / "templates/feather-delegation/SKILL.md").read_bytes()
+        self.bundle.components["delegation"]["files"][source] = DELEGATION_SKILL
+        checked = execute("check", self.env, self.bundle, ["delegation"], None)
+        self.assertEqual(checked["components"]["delegation"]["status"], "reused")
+        self.assertEqual(checked["runtime"]["roles"]["status"], "conflict")
+        with self.assertRaisesRegex(ValueError, "lack the runtime skill"):
+            execute("install", self.env, self.bundle, ["delegation"], None, entrance="project")
+        self.assertFalse((self.project / "AGENTS.md").exists())
+
     def test_crlf_model_table_preserves_line_endings(self):
-        key = "assets/templates/AGENTS.md"
+        key = "assets/templates/entrances/delegation.md"
         self.bundle.payload[key] = self.bundle.payload[key].replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
         self.install()
-        self.apply("security-executor.reasoning=medium")
         target = self.project / "AGENTS.md"
-        self.assertIn(b"| security-executor | gpt-6-sol | medium |\r\n", target.read_bytes())
+        before = target.read_bytes()
+        self.apply("security-executor.reasoning=medium")
+        self.assertEqual(target.read_bytes(), before.replace(
+            b"| security-executor | gpt-6-sol | high |",
+            b"| security-executor | gpt-6-sol | medium |"))
         execute("update", self.env, self.bundle, ["delegation"], None)
         self.assertEqual(run("show", self.env, [])["roles"]["security-executor"]["reasoning"], "medium")
 
@@ -142,7 +167,7 @@ class ModelTests(unittest.TestCase):
             run("show", self.env, [])
 
     def test_shared_entrance_upgrade_preserves_owners_and_blocks_reused_downgrade(self):
-        key = "assets/templates/AGENTS.md"
+        key = "assets/templates/entrances/delegation.md"
         latest = self.bundle.payload[key]
         legacy = latest.replace(b"gpt-6-", b"gpt-5.6-")
         self.bundle.payload[key] = legacy
@@ -172,7 +197,7 @@ class ModelTests(unittest.TestCase):
             run("preview", self.env, ["scout.reasoning=high"])
 
     def test_shared_entrance_upgrade_still_preserves_manual_edits(self):
-        key = "assets/templates/AGENTS.md"
+        key = "assets/templates/entrances/delegation.md"
         latest = self.bundle.payload[key]
         self.bundle.payload[key] = latest.replace(b"gpt-6-", b"gpt-5.6-")
         self.install("user", "user")
@@ -236,8 +261,8 @@ class ModelTests(unittest.TestCase):
         shutil.copyfile(ROOT / "skills/model/scripts/model.py", destination / "model.py")
         shutil.copytree(ROOT / "scripts/setup_installer", plugin / "scripts/setup_installer",
                         ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
-        (plugin / "templates").mkdir()
-        shutil.copyfile(ROOT / "templates/AGENTS.md", plugin / "templates/AGENTS.md")
+        (plugin / "templates/entrances").mkdir(parents=True)
+        shutil.copyfile(ROOT / "templates/entrances/delegation.md", plugin / "templates/entrances/delegation.md")
         before = {path.relative_to(self.base): path.read_bytes() for path in self.base.rglob("*") if path.is_file()}
         for action, extra in (("show", []), ("preview", ["--set", "scout.reasoning=max"])):
             result = subprocess.run([sys.executable, str(destination / "model.py"), action,

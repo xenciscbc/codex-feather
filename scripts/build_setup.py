@@ -24,8 +24,10 @@ def payload(destination: Path) -> None:
              for path in sorted((destination / "assets").rglob("*")) if path.is_file()}
     components = {"handoff": {"files": {source: source.replace("assets/skills/", ".agents/skills/", 1)
                                         for source in files if source.startswith("assets/skills/")}},
-                  "delegation": {"files": {source: ".codex/agents/" + Path(source).name
-                                            for source in files if source.startswith("assets/templates/") and source.endswith(".toml")}}}
+                  "delegation": {"files": {
+                      **{source: ".codex/agents/" + Path(source).name
+                         for source in files if source.startswith("assets/templates/") and source.endswith(".toml")},
+                      "assets/templates/feather-delegation/SKILL.md": ".agents/skills/feather-delegation/SKILL.md"}}}
     sources = [ROOT / "scripts/feather_setup.py", ROOT / "scripts/build_setup.py", *(ROOT / "scripts/setup_installer").glob("*.py")]
     try:
         # Metadata collection also runs inside plugin caches during check/dry-run.

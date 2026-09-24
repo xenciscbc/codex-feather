@@ -159,6 +159,10 @@ class PluginSetupTest(unittest.TestCase):
         agents = (self.project / "AGENTS.md").read_text(encoding="utf-8")
         self.assertIn(self.existing_agents, agents)
         self.assertIn("feather-setup:delegation:begin", agents)
+        self.assertIn("`feather-delegation` skill", agents)
+        self.assertLess(len(agents.split()), 450)
+        self.assertEqual((self.project / ".agents/skills/feather-delegation/SKILL.md").read_bytes(),
+                         (self.plugin / "templates/feather-delegation/SKILL.md").read_bytes())
         self.assertFalse((self.project / ".agents/skills/handoff").exists())
         self.assertEqual((self.project / ".feather/handoffs/work.md").read_text(), "My handoff data\n")
         checked = self.assert_success(self.run_setup("check"))
@@ -167,6 +171,7 @@ class PluginSetupTest(unittest.TestCase):
         removed = self.assert_success(self.run_setup("remove"))
         self.assertEqual(removed["components"]["delegation"]["status"], "removed")
         self.assertEqual((self.project / "AGENTS.md").read_text(encoding="utf-8"), self.existing_agents)
+        self.assertFalse((self.project / ".agents/skills/feather-delegation/SKILL.md").exists())
         self.assertEqual((self.project / ".feather/handoffs/work.md").read_text(), "My handoff data\n")
         self.assertFalse((self.project / ".agents/skills/handoff").exists())
         self.assertEqual(self.plugin_files(), source_before)

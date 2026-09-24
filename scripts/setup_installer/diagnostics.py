@@ -2,7 +2,7 @@
 from pathlib import Path
 import tomllib
 
-from .bundle import ROLES
+from .bundle import DELEGATION_SKILL, ROLES
 from .environment import Environment, find_codex
 from .transaction import read_regular
 
@@ -24,6 +24,14 @@ def inspect(environment: Environment, components: dict, codex: str | None) -> di
         found = set()
         for filename in paths:
             path = Path(filename)
+            if path.as_posix().endswith(DELEGATION_SKILL):
+                try:
+                    content = read_regular(path)
+                    if content is None or not content.startswith(b"---\nname: feather-delegation\n"):
+                        issues.append(f"Missing or invalid delegation skill: {path}")
+                except (OSError, ValueError) as error:
+                    issues.append(f"Cannot validate delegation skill {path}: {error}")
+                continue
             try:
                 content = read_regular(path)
                 if content is None:
