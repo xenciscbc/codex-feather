@@ -13,14 +13,14 @@ Handoffs live in Markdown files inside the project. The tool uses the Python sta
 
 ### Native Codex plugin
 
-The repository packages `handoff`, `handoff-list`, `handoff-save`, `setup`, `model`, `auto-on` and `auto-off` as a native plugin. Install the published version through the Git marketplace:
+The repository packages `handoff`, `handoff-list`, `handoff-save`, `handoff-resume`, `setup`, `model`, `auto-on` and `auto-off` as a native plugin. Install the published version through the Git marketplace:
 
 ```sh
 codex plugin marketplace add xenciscbc/codex-feather
 codex plugin add codex-feather@codex-feather
 ```
 
-Codex may display plugin-qualified skill names such as `codex-feather:handoff`; their short names are `handoff`, `handoff-list`, `handoff-save`, `setup`, `model`, `auto-on` and `auto-off`. Native child-role names have no such prefix.
+Codex may display plugin-qualified skill names such as `codex-feather:handoff`; their short names are `handoff`, `handoff-list`, `handoff-save`, `handoff-resume`, `setup`, `model`, `auto-on` and `auto-off`. Native child-role names have no such prefix.
 
 Start a new session and ask **“Use setup to configure Feather for this project”** or specify user scope. Setup first shows the project and user installation status, then asks which component to install, update, remove or migrate. Choices already stated in your request are preserved.
 
@@ -91,7 +91,7 @@ After installation, tell Codex what you want to do:
 | Toggle plan review | Use $auto-on for this session; use $auto-off project to save off in this project. |
 | Save progress | Use $handoff-save to save progress for the current work (plugin). |
 | List work | Use $handoff-list to list the current handoffs (plugin). |
-| Resume work | Use handoff to resume the login feature work. |
+| Resume work | Use $handoff-resume to resume the login feature work (plugin). |
 | Read progress only | Use handoff to read the login feature handoff. |
 | Save a source baseline | Save the login feature handoff with a baseline for `src/auth.py` and `config/auth.json`. |
 | Search completed work | Use handoff to search completed history for records mentioning login. |

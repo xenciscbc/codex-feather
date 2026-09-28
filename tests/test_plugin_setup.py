@@ -60,7 +60,7 @@ class PluginSetupTest(unittest.TestCase):
         self.addCleanup(cleanup)
         self.plugin = self.directory / "plugin cache/codex-feather"
         self.plugin.mkdir(parents=True)
-        for name in (".codex-plugin", "templates", "scripts", "skills/setup", "skills/handoff", "skills/handoff-list", "skills/handoff-save", "skills/model", "skills/auto-on", "skills/auto-off", "docs"):
+        for name in (".codex-plugin", "templates", "scripts", "skills/setup", "skills/handoff", "skills/handoff-list", "skills/handoff-save", "skills/handoff-resume", "skills/model", "skills/auto-on", "skills/auto-off", "docs"):
             source = ROOT / name
             target = self.plugin / name
             shutil.copytree(source, target, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))

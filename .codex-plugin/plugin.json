@@ -1,6 +1,6 @@
 {
   "name": "codex-feather",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Delegate bounded work and preserve resumable handoffs, with guided setup for native Codex roles.",
   "author": {
     "name": "xenciscbc"
@@ -10,7 +10,7 @@
   "interface": {
     "displayName": "Codex Feather",
     "shortDescription": "Guided role setup and resumable work handoffs.",
-    "longDescription": "Includes handoff, handoff-list, handoff-save, setup, model, auto-on and auto-off. Set up custom roles and agent guidance, choose role models and reasoning for a session or permanently, and preserve resumable work handoffs.",
+    "longDescription": "Includes handoff, handoff-list, handoff-save, handoff-resume, setup, model, auto-on and auto-off. Set up custom roles and agent guidance, choose role models and reasoning for a session or permanently, and preserve resumable work handoffs.",
     "developerName": "xenciscbc",
     "category": "Productivity",
     "capabilities": ["Read", "Write"],
