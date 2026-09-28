@@ -13,14 +13,14 @@
 
 ### 原生 Codex plugin
 
-Repository 包含 `handoff`、`setup`、`model`、`auto-on` 與 `auto-off` 五個 skills 的 plugin 封裝。可透過 Git marketplace 安裝已發布版本：
+Repository 包含 `handoff`、`handoff-list`、`handoff-save`、`setup`、`model`、`auto-on` 與 `auto-off` 七個 skills 的 plugin 封裝。可透過 Git marketplace 安裝已發布版本：
 
 ```powershell
 codex plugin marketplace add xenciscbc/codex-feather
 codex plugin add codex-feather@codex-feather
 ```
 
-Codex 可能以 `codex-feather:handoff` 等 plugin 命名空間顯示技能；其短名稱為 `handoff`／`setup`／`model`／`auto-on`／`auto-off`，子 Agent 名稱不帶此前綴。
+Codex 可能以 `codex-feather:handoff` 等 plugin 命名空間顯示技能；其短名稱為 `handoff`／`handoff-list`／`handoff-save`／`setup`／`model`／`auto-on`／`auto-off`，子 Agent 名稱不帶此前綴。
 
 開新 session，說「使用 setup 設定目前專案」或指定全域使用。Setup 先列出專案與使用者範圍的安裝狀態，再詢問要安裝、更新、移除或遷移哪一項；已指明的選擇不會重複詢問。
 
@@ -89,8 +89,8 @@ Auto 模式只在重大安全邊界變更、資料遷移、不可逆操作或複
 | 本次調整推理強度 | 用 model 將 scout 的推理強度改成 medium，只限這次 session。 |
 | 永久修改角色設定 | 用 model 永久將 executor 設成 gpt-6-sol，推理強度 high。 |
 | 切換計畫審查 | 用 $auto-on 設定本次 session；用 $auto-off project 保存到目前專案。 |
-| 保存目前進度 | 用 handoff 交接目前工作。 |
-| 查看工作清單 | 用 handoff 列出目前的交接。 |
+| 保存目前進度 | 用 $handoff-save 保存目前工作進度（plugin）。 |
+| 查看工作清單 | 用 $handoff-list 列出目前的交接（plugin）。 |
 | 接續工作 | 用 handoff 接續登入功能的工作。 |
 | 只看進度 | 用 handoff 讀取登入功能的交接。 |
 | 保存來源基準 | 保存登入功能的交接，記錄 `src/auth.py` 與 `config/auth.json` 的基準。 |

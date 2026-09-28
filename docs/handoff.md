@@ -2,6 +2,8 @@
 
 `handoff` 讓同一專案的新 session 從精簡 Markdown 接續工作。使用 [setup](setup.md) 可選擇專案或使用者範圍，並獨立決定是否加入入口指引。也可手動部署 `skills/handoff/` 整個目錄；安裝或更新後在新 session 使用。
 
+Plugin 提供兩個明確入口：`$handoff-list` 列出目前專案的交接清單，`$handoff-save` 保存目前工作的進度，也可附上工作名稱。兩者共用 `handoff` 的規則與工具；原本的 `handoff` 仍依指令與上下文處理列出、保存、讀取或接續。單獨呼叫保存入口即表示要求保存，只有工作對象不明時才詢問；列出入口只回傳清單。這兩個入口隨 plugin 提供，單獨部署 `skills/handoff/` 不包含它們。
+
 例如：
 
 > 用 handoff 交接 config-audit。已核對 port，還沒跑測試，下一步核對 readiness。
