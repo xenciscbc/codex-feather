@@ -6,6 +6,7 @@ import os
 import subprocess
 import unittest
 from unittest.mock import patch
+from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "skills/handoff/scripts"))
 from feather_handoff import storage
@@ -18,6 +19,79 @@ class HandoffStorageTest(unittest.TestCase):
         self.path = Path(self.temp.name) / "work.md"
         self.path.write_bytes(b"original")
         self.original = storage.read_file(self.path)
+
+    def test_windows_read_accepts_stable_ctime_difference_between_apis(self):
+        fstat = os.fstat
+        def changed_ctime(fd):
+            info = fstat(fd)
+            values = {name: getattr(info, name) for name in dir(info) if name.startswith("st_")}
+            values["st_ctime_ns"] += 1_000_000_000
+            return SimpleNamespace(**values)
+        with patch.object(storage.sys, "platform", "win32"), patch.object(os, "fstat", side_effect=changed_ctime):
+            self.assertEqual(storage.read_file(self.path).data, b"original")
+
+    def test_read_detects_descriptor_changes_even_with_windows_ctime_offset(self):
+        fstat = os.fstat
+        for field in ("st_dev", "st_ino", "st_size", "st_mtime_ns", "st_ctime_ns", "st_mode", "st_nlink"):
+            calls = 0
+            def changed(fd):
+                nonlocal calls
+                calls += 1
+                info = fstat(fd)
+                values = {name: getattr(info, name) for name in dir(info) if name.startswith("st_")}
+                values["st_ctime_ns"] += 1_000_000_000
+                if calls % 2 == 0:
+                    values[field] += 1
+                return SimpleNamespace(**values)
+            with self.subTest(field=field), patch.object(sys, "platform", "win32"), patch.object(os, "fstat", side_effect=changed):
+                with self.assertRaises(storage.HandoffError) as caught:
+                    storage.read_file(self.path)
+                self.assertEqual(caught.exception.code, "changed")
+
+    def test_posix_cross_api_ctime_difference_is_rejected(self):
+        fstat = os.fstat
+        def changed(fd):
+            info = fstat(fd)
+            values = {name: getattr(info, name) for name in dir(info) if name.startswith("st_")}
+            values["st_ctime_ns"] += 1_000_000_000
+            return SimpleNamespace(**values)
+        with patch.object(sys, "platform", "linux"), patch.object(os, "fstat", side_effect=changed):
+            with self.assertRaises(storage.HandoffError) as caught:
+                storage.read_file(self.path)
+            self.assertEqual(caught.exception.code, "changed")
+
+    def test_windows_path_ctime_change_is_rejected(self):
+        original_stat = os.stat
+        calls = 0
+        def changed(path, *args, **kwargs):
+            nonlocal calls
+            info = original_stat(path, *args, **kwargs)
+            if Path(path).name != "work.md" or not kwargs.get("follow_symlinks", True):
+                return info
+            calls += 1
+            values = {name: getattr(info, name) for name in dir(info) if name.startswith("st_")}
+            values["st_ctime_ns"] += calls
+            return SimpleNamespace(**values)
+        with patch.object(sys, "platform", "win32"), patch.object(os, "stat", side_effect=changed):
+            with self.assertRaises(storage.HandoffError) as caught:
+                storage.read_file(self.path)
+            self.assertEqual(caught.exception.code, "changed")
+
+    def test_real_file_write_during_read_is_rejected(self):
+        path = self.path
+        fstat = os.fstat
+        calls = 0
+        def write_after_open(fd):
+            nonlocal calls
+            calls += 1
+            info = fstat(fd)
+            if calls % 2:
+                path.write_bytes(b"changed" * calls)
+            return info
+        with patch.object(os, "fstat", side_effect=write_after_open):
+            with self.assertRaises(storage.HandoffError) as caught:
+                storage.read_file(path)
+            self.assertEqual(caught.exception.code, "changed")
 
     def test_permission_denial_is_not_retried(self):
         with patch.object(storage.os, "open", side_effect=PermissionError("sandbox denied")) as opened:

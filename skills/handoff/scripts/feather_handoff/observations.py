@@ -7,12 +7,7 @@ import stat
 import subprocess
 
 from . import baseline
-from .storage import HandoffError, Store, check_path, read_file, git_environment
-
-
-def signature(info):
-    return (info.st_dev, info.st_ino, info.st_mode, info.st_nlink,
-            info.st_size, info.st_mtime_ns, info.st_ctime_ns)
+from .storage import HandoffError, Store, check_path, read_file, git_environment, signature
 
 
 def source_info(project: Path, name: str):
@@ -48,7 +43,7 @@ def observe(project: Path, name: str, budget: list[int]):
             count = 0
             with path.open("rb") as handle:
                 opened = os.fstat(handle.fileno())
-                if signature(before) != signature(opened):
+                if signature(before, cross_api=True) != signature(opened, cross_api=True):
                     raise HandoffError("changed", "Source changed while opening")
                 while count < before.st_size:
                     chunk = handle.read(min(1024 * 1024, before.st_size - count))
@@ -59,7 +54,7 @@ def observe(project: Path, name: str, budget: list[int]):
                     digest.update(chunk)
                 after_read = os.fstat(handle.fileno())
             _, after = source_info(project, name)
-            if (after is None or count != before.st_size or signature(before) != signature(after_read)
+            if (after is None or count != before.st_size or signature(opened) != signature(after_read)
                     or signature(before) != signature(after)):
                 raise HandoffError("changed", "Source changed during read")
             return {"path": name, "state": "present", "sha256": digest.hexdigest()}, signature(after)

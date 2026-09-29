@@ -232,6 +232,87 @@ class ObservationUnitTest(unittest.TestCase):
         self.project = Path(self.temp.name)
         self.store = SimpleNamespace(project=self.project)
 
+    def test_windows_capture_accepts_stable_ctime_difference_between_apis(self):
+        (self.project / "a").write_bytes(b"original")
+        fstat = os.fstat
+        def changed_ctime(fd):
+            info = fstat(fd)
+            values = {name: getattr(info, name) for name in dir(info) if name.startswith("st_")}
+            values["st_ctime_ns"] += 1_000_000_000
+            return SimpleNamespace(**values)
+        with patch.object(sys, "platform", "win32"), patch.object(os, "fstat", side_effect=changed_ctime):
+            result = observations.capture(self.store, {"paths": ["a"]})
+        self.assertTrue(result["complete"], result)
+        self.assertEqual(result["snapshot"]["files"], [{"path": "a", "state": "present",
+                         "sha256": "0682c5f2076f099c34cfdd15a9e063849ed437a49677e6fcc5b4198c76575be5"}])
+
+    def test_read_detects_descriptor_changes_even_with_windows_ctime_offset(self):
+        (self.project / "a").write_bytes(b"original")
+        fstat = os.fstat
+        for field in ("st_dev", "st_ino", "st_size", "st_mtime_ns", "st_ctime_ns", "st_mode", "st_nlink"):
+            calls = 0
+            def changed(fd):
+                nonlocal calls
+                calls += 1
+                info = fstat(fd)
+                values = {name: getattr(info, name) for name in dir(info) if name.startswith("st_")}
+                values["st_ctime_ns"] += 1_000_000_000
+                if calls % 2 == 0:
+                    values[field] += 1
+                return SimpleNamespace(**values)
+            with self.subTest(field=field), patch.object(sys, "platform", "win32"), patch.object(os, "fstat", side_effect=changed):
+                result = observations.capture(self.store, {"paths": ["a"]})
+                self.assertFalse(result["complete"])
+                self.assertEqual(result["snapshot"]["files"][0]["reason"], "changed")
+
+    def test_posix_cross_api_ctime_difference_is_rejected(self):
+        (self.project / "a").write_bytes(b"original")
+        fstat = os.fstat
+        def changed(fd):
+            info = fstat(fd)
+            values = {name: getattr(info, name) for name in dir(info) if name.startswith("st_")}
+            values["st_ctime_ns"] += 1_000_000_000
+            return SimpleNamespace(**values)
+        with patch.object(sys, "platform", "linux"), patch.object(os, "fstat", side_effect=changed):
+            result = observations.capture(self.store, {"paths": ["a"]})
+            self.assertFalse(result["complete"])
+            self.assertEqual(result["snapshot"]["files"][0]["reason"], "changed")
+
+    def test_windows_path_ctime_change_is_rejected(self):
+        (self.project / "a").write_bytes(b"original")
+        original_stat = os.stat
+        calls = 0
+        def changed(path, *args, **kwargs):
+            nonlocal calls
+            info = original_stat(path, *args, **kwargs)
+            if Path(path).name != "a" or not kwargs.get("follow_symlinks", True):
+                return info
+            calls += 1
+            values = {name: getattr(info, name) for name in dir(info) if name.startswith("st_")}
+            values["st_ctime_ns"] += calls
+            return SimpleNamespace(**values)
+        with patch.object(sys, "platform", "win32"), patch.object(os, "stat", side_effect=changed):
+            result = observations.capture(self.store, {"paths": ["a"]})
+            self.assertFalse(result["complete"])
+            self.assertEqual(result["snapshot"]["files"][0]["reason"], "changed")
+
+    def test_real_file_write_during_read_is_rejected(self):
+        path = self.project / "a"
+        path.write_bytes(b"original")
+        fstat = os.fstat
+        calls = 0
+        def write_after_open(fd):
+            nonlocal calls
+            calls += 1
+            info = fstat(fd)
+            if calls % 2:
+                path.write_bytes(b"changed" * calls)
+            return info
+        with patch.object(os, "fstat", side_effect=write_after_open):
+            result = observations.capture(self.store, {"paths": ["a"]})
+            self.assertFalse(result["complete"])
+            self.assertEqual(result["snapshot"]["files"][0]["reason"], "changed")
+
     def test_full_observation_matrix(self):
         examples = {"present": {"state": "present", "sha256": "a"}, "missing": {"state": "missing"},
                     "unknown": {"state": "unknown", "reason": "unreadable"}}

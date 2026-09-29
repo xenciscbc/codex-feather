@@ -6,6 +6,7 @@ from pathlib import Path
 import stat
 import subprocess
 import secrets
+import sys
 
 
 class HandoffError(ValueError):
@@ -97,6 +98,15 @@ class Snapshot:
         return self.data.decode("utf-8-sig")
 
 
+def signature(info: os.stat_result, *, cross_api: bool = False) -> tuple[int, ...]:
+    """Keep ctime for same-API checks; Windows stat/fstat can disagree on it."""
+    fields = (info.st_dev, info.st_ino, info.st_mode, info.st_nlink,
+              info.st_size, info.st_mtime_ns)
+    if cross_api and sys.platform == "win32":
+        return fields
+    return (*fields, info.st_ctime_ns)
+
+
 def read_file(path: Path) -> Snapshot:
     check_path(path)
     before = path.stat()
@@ -104,14 +114,14 @@ def read_file(path: Path) -> Snapshot:
         raise HandoffError("not-file", f"Not a regular file: {path}")
     with path.open("rb") as handle:
         opened = os.fstat(handle.fileno())
-        if (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino):
+        if signature(opened, cross_api=True) != signature(before, cross_api=True):
             raise HandoffError("changed", f"File changed while opening: {path}")
         data = handle.read()
         after_read = os.fstat(handle.fileno())
     check_path(path)
     after = path.stat()
-    signature = lambda info: (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
-    if signature(before) != signature(after_read) or signature(before) != signature(after):
+    if (signature(opened) != signature(after_read) or signature(before) != signature(after)
+            or len(data) != before.st_size):
         raise HandoffError("changed", f"File changed during read: {path}")
     return Snapshot(path, data)
 
