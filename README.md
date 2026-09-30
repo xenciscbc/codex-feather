@@ -51,14 +51,14 @@ User scope provides a shared installation for your local user; project scope ins
 | Role | Responsibility | Native permissions | Default model / reasoning |
 | --- | --- | --- | --- |
 | scout | Locate and extract cited facts | read-only; no file output | gpt-6-luna / low |
-| analyst | Causal, impact, security analysis and plan review | workspace-write; protect sources, only explicitly assigned artifacts | gpt-6-sol / high |
+| analyst | Causal, impact, security analysis and plan review | workspace-write; protect sources, only explicitly assigned artifacts | gpt-6.1-sol / high |
 | mech-executor | Fully specified repetitive edits | workspace-write, assigned scope only | gpt-6-luna / medium |
-| executor | Implementation needing local engineering judgment | workspace-write, assigned scope only | gpt-6-sol / medium |
-| security-executor | Authorized security implementation, allowed and abuse/denial checks | workspace-write, assigned scope only | gpt-6-sol / high |
+| executor | Implementation needing local engineering judgment | workspace-write, assigned scope only | gpt-6.1-sol / medium |
+| security-executor | Authorized security implementation, allowed and abuse/denial checks | workspace-write, assigned scope only | gpt-6.1-sol / high |
 
 Only the main agent delegates; children do not delegate further. Each child reports results, changes, validation, and blockers for the main agent to review. Writes to shared resources are serialized. If the same blocker recurs, the main agent takes the task back and preserves existing results instead of retrying it unchanged indefinitely.
 
-Model and reasoning resolve independently: applicable task setting, session override, saved setting, then packaged default. Defaults are scout `gpt-6-luna/low`, analyst `gpt-6-sol/high`, mech-executor `gpt-6-luna/medium`, executor `gpt-6-sol/medium`, and security-executor `gpt-6-sol/high`. Your main model and concurrency preferences remain unchanged. Native dispatch passes both fields; configuration and child self-report do not prove actual model use. Unavailable combinations are reported. See the [short entrance](templates/entrances/delegation.md) for defaults and the [delegation skill](templates/feather-delegation/SKILL.md) for the full contract.
+Model and reasoning resolve independently: applicable task setting, session override, saved setting, then packaged default. Defaults are scout `gpt-6-luna/low`, analyst `gpt-6.1-sol/high`, mech-executor `gpt-6-luna/medium`, executor `gpt-6.1-sol/medium`, and security-executor `gpt-6.1-sol/high`. Your main model and concurrency preferences remain unchanged. Native dispatch passes both fields; configuration and child self-report do not prove actual model use. Unavailable combinations are reported. See the [short entrance](templates/entrances/delegation.md) for defaults and the [delegation skill](templates/feather-delegation/SKILL.md) for the full contract.
 
 ### Change role models
 
@@ -83,11 +83,11 @@ After installation, tell Codex what you want to do:
 | Task | Example request |
 | --- | --- |
 | Choose review role and model | Use analyst with gpt-6-luna and high reasoning to review this authorization plan. |
-| Choose security implementation | Use security-executor with gpt-6-sol to fix the confirmed authorization issue and verify denial cases. |
+| Choose security implementation | Use security-executor with gpt-6.1-sol to fix the confirmed authorization issue and verify denial cases. |
 | Delegate work | Delegate a review of the login feature, identify problems, and fix them. |
 | Inspect role settings | Use model to show the current models and reasoning effort. |
 | Change a session setting | Use model to set scout reasoning to medium for this session only. |
-| Save a role setting | Use model to permanently set executor to gpt-6-sol with high reasoning. |
+| Save a role setting | Use model to permanently set executor to gpt-6.1-sol with high reasoning. |
 | Toggle plan review | Use $auto-on for this session; use $auto-off project to save off in this project. |
 | Save progress | Use $handoff-save to save progress for the current work (plugin). |
 | List work | Use $handoff-list to list the current handoffs (plugin). |

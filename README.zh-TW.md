@@ -51,14 +51,14 @@ Codex 可能以 `codex-feather:handoff` 等 plugin 命名空間顯示技能；�
 | 角色 | 用途 | 原生權限 | 模型／推理預設 |
 | --- | --- | --- | --- |
 | scout | 找位置、擷取可引用事實 | read-only，不產出檔案 | gpt-6-luna／low |
-| analyst | 因果、影響、安全分析及計畫審查 | workspace-write；來源禁止修改，只能寫明確指定成果 | gpt-6-sol／high |
+| analyst | 因果、影響、安全分析及計畫審查 | workspace-write；來源禁止修改，只能寫明確指定成果 | gpt-6.1-sol／high |
 | mech-executor | 依完整規格重複修改 | workspace-write，僅指定範圍 | gpt-6-luna／medium |
-| executor | 需要局部工程判斷的實作 | workspace-write，僅指定範圍 | gpt-6-sol／medium |
-| security-executor | 已授權安全敏感實作，驗證正常與濫用／拒絕案例 | workspace-write，僅指定範圍 | gpt-6-sol／high |
+| executor | 需要局部工程判斷的實作 | workspace-write，僅指定範圍 | gpt-6.1-sol／medium |
+| security-executor | 已授權安全敏感實作，驗證正常與濫用／拒絕案例 | workspace-write，僅指定範圍 | gpt-6.1-sol／high |
 
 只有主 Agent 派工，子 Agent 不再向下委派。每個子任務回報成果、變更、驗證與阻礙，由主 Agent 驗收；共享寫入依序處理。同一原因再次阻塞時收回處理，保留已有成果，避免原樣無限重試。
 
-模型與 reasoning 各自依適用任務指定、session 覆寫、已保存設定、封裝預設決定。五角色預設為 scout `gpt-6-luna/low`、analyst `gpt-6-sol/high`、mech-executor `gpt-6-luna/medium`、executor `gpt-6-sol/medium`、security-executor `gpt-6-sol/high`。主模型與並行偏好不變。原生派工傳入兩欄；設定或子 Agent 自述不能證明實際模型。預設值見[精簡入口](templates/entrances/delegation.md)，完整規則見[執行時 skill](templates/feather-delegation/SKILL.md)。
+模型與 reasoning 各自依適用任務指定、session 覆寫、已保存設定、封裝預設決定。五角色預設為 scout `gpt-6-luna/low`、analyst `gpt-6.1-sol/high`、mech-executor `gpt-6-luna/medium`、executor `gpt-6.1-sol/medium`、security-executor `gpt-6.1-sol/high`。主模型與並行偏好不變。原生派工傳入兩欄；設定或子 Agent 自述不能證明實際模型。預設值見[精簡入口](templates/entrances/delegation.md)，完整規則見[執行時 skill](templates/feather-delegation/SKILL.md)。
 
 ### 修改角色模型
 
@@ -83,11 +83,11 @@ Auto 模式只在重大安全邊界變更、資料遷移、不可逆操作或複
 | 想做的事 | 可以這樣說 |
 | --- | --- |
 | 指定分析角色與模型 | 用 analyst，以 gpt-6-luna 審查這個授權計畫；推理強度 high。 |
-| 指定安全實作 | 用 security-executor，以 gpt-6-sol 修正已確認的授權漏洞並驗證拒絕案例。 |
+| 指定安全實作 | 用 security-executor，以 gpt-6.1-sol 修正已確認的授權漏洞並驗證拒絕案例。 |
 | 分工處理任務 | 幫我分工檢查登入功能，找出問題並修正。 |
 | 查看角色設定 | 用 model 列出目前模型與推理強度。 |
 | 本次調整推理強度 | 用 model 將 scout 的推理強度改成 medium，只限這次 session。 |
-| 永久修改角色設定 | 用 model 永久將 executor 設成 gpt-6-sol，推理強度 high。 |
+| 永久修改角色設定 | 用 model 永久將 executor 設成 gpt-6.1-sol，推理強度 high。 |
 | 切換計畫審查 | 用 $auto-on 設定本次 session；用 $auto-off project 保存到目前專案。 |
 | 保存目前進度 | 用 $handoff-save 保存目前工作進度（plugin）。 |
 | 查看工作清單 | 用 $handoff-list 列出目前的交接（plugin）。 |

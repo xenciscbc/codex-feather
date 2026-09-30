@@ -275,7 +275,7 @@ def retry_delay(attempt, base, cap):
                     self.assertIn("locks model or reasoning", result.stderr)
 
     def test_override_trials_keep_unspecified_defaults_and_sources_readonly(self):
-        cases = [("scout-model", "scout", "gpt-6-sol", "low", "settings.toml"),
+        cases = [("scout-model", "scout", "gpt-6.1-sol", "low", "settings.toml"),
                  ("scout-effort", "scout", "gpt-6-luna", "high", "settings.toml"),
                  ("analyst-override", "analyst", "gpt-6-luna", "low", "access.py")]
         for scenario, role, model, effort, fixture in cases:

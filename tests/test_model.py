@@ -102,8 +102,8 @@ class ModelTests(unittest.TestCase):
         before = target.read_bytes()
         self.apply("security-executor.reasoning=medium")
         self.assertEqual(target.read_bytes(), before.replace(
-            b"| security-executor | gpt-6-sol | high |",
-            b"| security-executor | gpt-6-sol | medium |"))
+            b"| security-executor | gpt-6.1-sol | high |",
+            b"| security-executor | gpt-6.1-sol | medium |"))
         execute("update", self.env, self.bundle, ["delegation"], None)
         self.assertEqual(run("show", self.env, [])["roles"]["security-executor"]["reasoning"], "medium")
 

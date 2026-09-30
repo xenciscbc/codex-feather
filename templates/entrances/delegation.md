@@ -12,7 +12,7 @@ Role defaults for dispatch (model / reasoning):
 | Role | Model | Reasoning |
 | --- | --- | --- |
 | scout | gpt-6-luna | low |
-| analyst | gpt-6-sol | high |
+| analyst | gpt-6.1-sol | high |
 | mech-executor | gpt-6-luna | medium |
-| executor | gpt-6-sol | medium |
-| security-executor | gpt-6-sol | high |
+| executor | gpt-6.1-sol | medium |
+| security-executor | gpt-6.1-sol | high |
