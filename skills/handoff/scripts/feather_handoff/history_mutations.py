@@ -47,7 +47,7 @@ def clear_history(store: Store, raw: object) -> dict:
     original = read_file(history_path(store, source))
     if payload.get("version") != original.version:
         raise HandoffError("conflict", "History changed or version missing; query and reconcile original selection")
-    document = parse_history(original)
+    document = parse_history(original, source)
     entries = selection(document, payload.get("ids"))
     expected = remainder(document, entries)
     try:
@@ -112,7 +112,7 @@ def seal_history(store: Store, raw: object) -> dict:
     if "destination_version" in payload:
         if existing is None or payload["destination_version"] != existing.version:
             raise HandoffError("conflict", "Retry destination missing or changed")
-        target_document = parse_history(existing)
+        target_document = parse_history(existing, "archive/" + name)
         target_entries = selection(target_document, payload.get("ids"))
         if len(target_entries) != len(target_document.entries):
             raise HandoffError("selection", "Retry must identify every entry in the original destination")

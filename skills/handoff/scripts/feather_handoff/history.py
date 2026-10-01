@@ -85,13 +85,19 @@ def parse_history(snapshot: Snapshot, source: str | None = None) -> HistoryDocum
     source = source or snapshot.path.name
     reliable = []
     legacy_status = []
-    for heading in HEADING.finditer(text):
+    headings = list(HEADING.finditer(text))
+    # Archival only appends modern entries, so legacy entries precede the first one;
+    # later legacy-looking headings belong to an archived body.
+    first_modern = next((h.start() for h in headings if MODERN.fullmatch(h.group(1).strip())), len(text))
+    for heading in headings:
         label = heading.group(1).strip()
         body_start = _body_start(text, heading.end())
         modern = MODERN.fullmatch(label)
         if modern:
             reliable.append(_Start(heading.start(), body_start, modern.group(1).strip(),
                                    modern.group(2).strip(), True))
+            continue
+        if heading.start() > first_modern:
             continue
         completed = LEGACY_COMPLETED.match(text[body_start:])
         if completed:

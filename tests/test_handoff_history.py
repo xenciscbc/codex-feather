@@ -107,18 +107,26 @@ class HandoffHistoryTest(unittest.TestCase):
         self.assertTrue(entry["boundary_known"])
         self.assertIn("no timezone", " ".join(entry["problems"]))
 
-    def test_possible_legacy_boundary_inside_modern_history_is_reported(self):
+    def test_legacy_looking_heading_after_a_modern_entry_stays_in_its_body(self):
+        # Archival appends only modern entries, so such a heading is archived content.
         content = ("# history\n\n## current · 完成：2026-09-08T10:00:00+00:00\ncurrent body\n"
                    "## possible-old\n狀態：完成\n進度：unknown boundary\n"
                    "## later · 完成：2026-09-09T10:00:00+00:00\nlater body\n")
         self.write("history.md", content)
+        result = self.run_history()
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual([entry["title"] for entry in result["entries"]], ["current", "later"])
+        self.assertIn("## possible-old\n狀態：完成\n", result["entries"][0]["body"])
+        self.assertTrue(all(entry["boundary_known"] for entry in result["entries"]))
+
+    def test_legacy_status_entry_before_modern_entries_is_still_reported(self):
+        content = ("# history\n\n## old\n狀態：完成\nlegacy body\n"
+                   "## current · 完成：2026-09-08T10:00:00+00:00\ncurrent body\n")
+        self.write("history.md", content)
         result = self.run_history(expected=2)
         self.assertEqual(result["status"], "partial")
-        self.assertIn("possible-old", " ".join(issue["message"] for issue in result["issues"]))
-        self.assertEqual([entry["title"] for entry in result["entries"]],
-                         ["current", "possible-old", "later"])
+        self.assertEqual([entry["title"] for entry in result["entries"]], ["old", "current"])
         self.assertFalse(result["entries"][0]["boundary_known"])
-        self.assertFalse(result["entries"][1]["boundary_known"])
 
     def test_missing_invalid_query_and_partial_source_failure_are_distinct(self):
         missing = self.run_history()
