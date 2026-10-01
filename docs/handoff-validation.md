@@ -1,6 +1,26 @@
 # feather-handoff 驗收紀錄
 
-同日後續已將新版 skill 納入 Windows／Linux 重建包，位於 `dist/2026-09-09/`。發行包解壓與升級驗收見 [安裝器驗證紀錄](setup-validation.md)；以下保留技能補強當時的測試範圍。
+## cc-feather v0.7.0 新待辦規則相容（2026-10-01）
+
+主 handoff skill 納入新待辦分類、重用既有記錄、只記錄不執行、決定後清除待決項與歸檔完成回報；handoff-save 明確沿用共享分類並回報所有寫入路徑。格式、狀態、儲存位置與 Python runtime 未變更。
+
+`python -B -m unittest tests.test_handoff_tool tests.test_handoff_archive tests.test_handoff_mutations` 共 28 項通過。新增公開 CLI 相容測試讀取含兩個 `待決：` 與工作指向的舊格式記錄，更新進度後核對單行 `注意：` 原樣保留，再完成歸檔並確認歷史保留完整注意文字、原工作檔已移除。兩個 skill 的 quick_validate 以 `python -X utf8 -B` 執行均通過；Windows 預設 cp950 無法解碼中文內容時，需啟用 UTF-8。
+
+本輪驗證的是工具讀寫相容與指令內容，未執行全新 headless session 的模型行為測試，不將 cc-feather 的 3/3 結果當成 Codex 實測。後續行為驗收沿用以下情境，另核對完整工具事件與最終回報：
+
+| 情境 | 預期結果 |
+| --- | --- |
+| A：重構中發現無關的 README 安裝指令過時 | 另存交接；目前注意欄最多留指向；README 不修改。 |
+| B：billing/admin 舊 handler 會擋住編譯 | 留在目前下一步，不另開記錄。 |
+| C：尚未決定是否加 retry | 目前注意欄記 `待決：`，不另開記錄。 |
+| D：A 已有對應交接 | 讀取並更新既有記錄，不重複建立。 |
+| E：完成時仍有 retry 待決項 | 正常歸檔後，完成回報列出待決項供使用者決定。 |
+| F：決定做 retry，且與重構無關 | 另存交接，移除舊待決文字，最多保留指向。 |
+| G：決定不做 retry | 移除待決文字，不另開記錄。 |
+
+測 `$handoff-save` 時，同一 session 分兩次執行：第一次提供情境並明確要求「先不要建立或更新任何交接記錄」，第二次只送保存入口，避免第一次已保存而未測到入口。A–C 也需透過此入口驗收。
+
+2026-09-09 後續已將當時新版 skill 納入 Windows／Linux 重建包，位於 `dist/2026-09-09/`。發行包解壓與升級驗收見 [安裝器驗證紀錄](setup-validation.md)；以下保留技能補強當時的測試範圍。
 
 ## 完整性與歷史封存補強（2026-09-09）
 

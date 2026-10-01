@@ -114,6 +114,29 @@ class HandoffToolTest(unittest.TestCase):
         self.assertEqual(before, self.snapshot())
         self.assertEqual(self.run_tool("read", "--work", "config-audit.md")["content"], RECORD)
 
+    def test_cc_feather_todo_notes_round_trip_and_archive_without_schema_changes(self):
+        notes = "待決：是否加 retry；待決：是否加 metrics；另立為工作 readme-install-docs。"
+        content = RECORD.replace("timeout 等待使用者決定。", notes)
+        work = self.write_work(content=content)
+        original = self.run_tool("read", "--work", work.name)
+        self.assertEqual(original["content"], content)
+        self.assertTrue(self.run_tool("list")["complete"])
+
+        self.run_tool("update", "--work", work.name, payload={
+            "version": original["version"], "fields": {"progress": "已核對 readiness。"}})
+        updated = self.run_tool("read", "--work", work.name)
+        self.assertIn("注意：" + notes + "\n", updated["content"])
+
+        self.run_tool("update", "--work", work.name, payload={
+            "version": updated["version"],
+            "fields": {"status": "完成", "next": "無"}})
+        self.assertFalse(work.exists())
+        history = self.run_tool("history")
+        self.assertEqual(len(history["entries"]), 1)
+        saved = (self.directory / "history.md").read_text(encoding="utf-8")
+        self.assertIn("注意：" + notes + "\n", saved)
+        self.assertEqual(saved.count("注意："), 1)
+
     def test_create_validates_before_writing_and_respects_git_tracking(self):
         payload = {"fields": {"goal": "Audit", "progress": "Port checked", "next": "Read readiness"}}
         invalid = {"fields": {**payload["fields"], "status": "done"}}
