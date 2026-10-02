@@ -1,5 +1,6 @@
 """Public handoff commands against real, isolated project files."""
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -15,10 +16,33 @@ RECORD = ("# config-audit\n更新：2026-09-11T10:00:00+08:00\n狀態：進行�
 
 
 class HandoffToolTest(unittest.TestCase):
+    def test_cc_feather_todo_notes_round_trip_and_archive_without_schema_changes(self):
+        notes = "待決：是否加 retry；待決：是否加 metrics；另立為工作 readme-install-docs。"
+        content = RECORD.replace("timeout 等待使用者決定。", notes)
+        work = self.write_work(content=content)
+        original = self.run_tool("read", "--work", work.name)
+        self.assertEqual(original["content"], content)
+        self.assertTrue(self.run_tool("list")["complete"])
+
+        self.run_tool("update", "--work", work.name, payload={
+            "version": original["version"], "fields": {"progress": "已核對 readiness。"}})
+        updated = self.run_tool("read", "--work", work.name)
+        self.assertIn("注意：" + notes + "\n", updated["content"])
+
+        self.run_tool("update", "--work", work.name, payload={
+            "version": updated["version"],
+            "fields": {"status": "完成", "next": "無"}})
+        self.assertFalse(work.exists())
+        history = self.run_tool("history")
+        self.assertEqual(len(history["entries"]), 1)
+        saved = (self.directory / "history.md").read_text(encoding="utf-8")
+        self.assertIn("注意：" + notes + "\n", saved)
+        self.assertEqual(saved.count("注意："), 1)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.project = Path(self.temp.name)
+        self.project = Path(os.path.realpath(self.temp.name))
         self.directory = self.project / ".feather/handoffs"
 
     def run_tool(self, *args, payload=None, expected=0):
@@ -114,29 +138,6 @@ class HandoffToolTest(unittest.TestCase):
         self.assertEqual(before, self.snapshot())
         self.assertEqual(self.run_tool("read", "--work", "config-audit.md")["content"], RECORD)
 
-    def test_cc_feather_todo_notes_round_trip_and_archive_without_schema_changes(self):
-        notes = "待決：是否加 retry；待決：是否加 metrics；另立為工作 readme-install-docs。"
-        content = RECORD.replace("timeout 等待使用者決定。", notes)
-        work = self.write_work(content=content)
-        original = self.run_tool("read", "--work", work.name)
-        self.assertEqual(original["content"], content)
-        self.assertTrue(self.run_tool("list")["complete"])
-
-        self.run_tool("update", "--work", work.name, payload={
-            "version": original["version"], "fields": {"progress": "已核對 readiness。"}})
-        updated = self.run_tool("read", "--work", work.name)
-        self.assertIn("注意：" + notes + "\n", updated["content"])
-
-        self.run_tool("update", "--work", work.name, payload={
-            "version": updated["version"],
-            "fields": {"status": "完成", "next": "無"}})
-        self.assertFalse(work.exists())
-        history = self.run_tool("history")
-        self.assertEqual(len(history["entries"]), 1)
-        saved = (self.directory / "history.md").read_text(encoding="utf-8")
-        self.assertIn("注意：" + notes + "\n", saved)
-        self.assertEqual(saved.count("注意："), 1)
-
     def test_create_validates_before_writing_and_respects_git_tracking(self):
         payload = {"fields": {"goal": "Audit", "progress": "Port checked", "next": "Read readiness"}}
         invalid = {"fields": {**payload["fields"], "status": "done"}}
@@ -148,7 +149,7 @@ class HandoffToolTest(unittest.TestCase):
         self.run_tool("create", "--work", "audit.md", payload=payload)
         self.assertEqual(ignore.read_text(), "# Existing\n*.log\n/.feather/handoffs/\n")
         self.run_tool("create", "--work", "tracked.md", payload={**payload, "tracking": "track"})
-        self.assertEqual(ignore.read_text(), "# Existing\n*.log\n")
+        self.assertEqual(ignore.read_text(), "# Existing\n*.log\n# cc-feather: track /.feather/handoffs/\n")
         index = subprocess.run(["git", "-c", f"safe.directory={self.project.as_posix()}", "-C",
                                 str(self.project), "ls-files"], capture_output=True, check=True)
         self.assertEqual(index.stdout, b"")

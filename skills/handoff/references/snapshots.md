@@ -4,7 +4,7 @@ Read this reference when saving selected source observations or resuming a hando
 
 ## Capture and save
 
-Choose explicit project-relative ordinary files relevant to the work, including expected missing files when useful. Use `/` separators; directories, globs, duplicate paths, absolute paths, `..`, links/reparse paths, hard links, Git metadata and `.feather/handoffs` sources are excluded. Sources remain unchanged.
+Choose explicit project-relative ordinary files relevant to the work, including expected missing files when useful. Use `/` separators; directories, globs, duplicate paths, absolute paths, `..`, links and alias or unidentified reparse paths (see [the tool reference](tool.md#read)), hard links, Git metadata and `.feather/handoffs` sources are excluded. Sources remain unchanged.
 
 ```text
 python -B <skill>/scripts/handoff.py --project <project> snapshot
@@ -27,7 +27,7 @@ The capture timestamp alone is no proof that the test used those bytes. Any sele
 
 The writer rechecks explicitly supplied present/missing observations and known Git identity before saving. On `snapshot-conflict`, reread the relevant sources and handoff, reconcile progress, then capture again if appropriate. It never silently refreshes the baseline. Unknown observations remain unknown and are not reread during save verification. Ordinary updates without `snapshot` preserve the old baseline even when sources changed. `snapshot: null` is rejected; no separate baseline-removal command exists.
 
-Baseline validation failures happen before saving. Tracking or archival failures after saving use the existing partial-result recovery, including the surviving path/version; do not repeat create over a saved handoff. Completion and sealing retain the full baseline, and retries preserve the completion identity.
+Baseline validation failures happen before saving. Tracking (`tracking-failed`) or archival (`archive-failed`) failures after saving use the partial result's `recovery`, including the surviving path/version: a completed handoff is retried with `archive` and the same `tracking` choice, not update; do not repeat create over a saved handoff. Completion and sealing retain the full baseline, and retries preserve the completion identity.
 
 ## Compare before resuming
 

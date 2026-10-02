@@ -109,12 +109,14 @@ def capture(store: Store, payload: object) -> dict:
         if item["state"] == "unknown":
             continue
         try:
-            _, current = source_info(store.project, item["path"])
+            path, current = source_info(store.project, item["path"])
             current_signature = signature(current) if current else None
             if current_signature != saved_signature:
                 files[index] = unknown(item["path"], "changed")
             if current_signature:
                 identity = current_signature[:2]
+                if identity[1] == 0:  # st_ino unavailable: fall back to the resolved path
+                    identity = os.path.normcase(str(path.resolve()))
                 if identity in identities:
                     previous = identities[identity]
                     files[previous] = unknown(files[previous]["path"], "duplicate-source")

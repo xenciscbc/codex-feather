@@ -1,0 +1,39 @@
+{
+  "source": "cc-feather sibling checkout",
+  "commit": "e72aef80c4b6d0fb32791b4d51da0b1f131642eb",
+  "version": "0.10.1",
+  "captured_at": "2026-10-02T13:26:57.094911+00:00",
+  "files": {
+    "skills/handoff/scripts/handoff.py": "cb18fa4a4d3c350e1cba2f13162a5d03d87262651c6be5ae09e3d3abaeeeb491",
+    "skills/handoff/scripts/feather_handoff/archiving.py": "57d78c77ee5085b93b45b8d0a4b6a1787d4af7da939f0642d8bd49b78a0c142c",
+    "skills/handoff/scripts/feather_handoff/baseline.py": "726edc300cc0460a3f02e4c7a12f542cb038d131ddf4ed28da0032097b99b062",
+    "skills/handoff/scripts/feather_handoff/cli.py": "e17ccffec1f66b83dca99f15d6f1fcd74c052eb96ea23221d2ae9c6047866bfd",
+    "skills/handoff/scripts/feather_handoff/history.py": "238153ce6c6d0d728591b6fa622d06b0d3c137ff0d843c3386741107297d855d",
+    "skills/handoff/scripts/feather_handoff/history_mutations.py": "da86a9249595192f8c8d22b240c95f1cb529370491c463846ea883b267d03208",
+    "skills/handoff/scripts/feather_handoff/observations.py": "43a09d92e6f95ebd17c36849889f86c1894b4a1096a9960b4d9be9180374e478",
+    "skills/handoff/scripts/feather_handoff/records.py": "429cb242fe35379d06b283b588c880857986a6dd425d000fb382052fc615f099",
+    "skills/handoff/scripts/feather_handoff/storage.py": "c3bef2ee22ce85d373f5b03f7570874df0f2d06e0a84962a52d38a996f9f2eb0",
+    "skills/handoff/scripts/feather_handoff/tracking.py": "54324573f51d43b8465212b11a0449857989a570cd14dda0f345d97ac6048ed5",
+    "skills/handoff/scripts/feather_handoff/writing.py": "0479b206a50be1e150a2dc0ffa699c82586b7d9d33d168c0ce9a8c699017a5ba",
+    "skills/handoff/scripts/feather_handoff/__init__.py": "734d59568233868e61dffbbad4cbc721b40a94d169cf965221d51f534e5470d2",
+    "tests/test_handoff_archive.py": "1d80fbc62eb437343b8d1696affafeb511d60cf796c9d866701b51e576040f38",
+    "tests/test_handoff_baseline.py": "5a2704812a91efa1a7bcf1526568cd1c257a89d3521c8ca3152edbc47423bc1a",
+    "tests/test_handoff_history.py": "547a0a45ab3b143a6a28b6264caa743196b703fc0faa1dc86bd9293f2864b2c0",
+    "tests/test_handoff_history_boundaries.py": "1e40e15d06556f9b359855cb0b0a47f7fcd919f5565edee346dd99bdc32e7b5d",
+    "tests/test_handoff_links.py": "c22276a30d0aa2abf34c2a28b3ac94cfebecc53f6e20e01a6b0d55cdb0a1002a",
+    "tests/test_handoff_local_fixes.py": "9202020c61912a399158a8d1b65071ecc168e414c0aa637ec181d76698792a12",
+    "tests/test_handoff_mutations.py": "c3fbd0636766df448eabd2c27892caf0c911d49e77d1983b178cf217c3d90e50",
+    "tests/test_handoff_roots.py": "0169e6d0e9497b9f31bb56f7f4dac8fc642fbd9e80dd9d7a7db12401c1fb6384",
+    "tests/test_handoff_snapshots.py": "ddc69458e6c1c3eace598f683837b060a3f54532c5b7900a9d7af62c8a31ffb4",
+    "tests/test_handoff_storage.py": "63bbe65b8a21a0cb5fa50b6e083e302ca9cb95d709c516881223388b58b9cbea",
+    "tests/test_handoff_tool.py": "968ca3f4fd6e138f196f3be7119b83108e702cc575c92d2a37929ffff9e2151e",
+    "skills/handoff/references/tool.md": "37ed706ad404fd5a326c81f385a46c5ba084afc12c73369a75f6b637ac389f45",
+    "skills/handoff/references/snapshots.md": "23f136a507742018c86da4e8a3fa468a681f4ad20d907d35582d8358be01fdbe",
+    "skills/handoff/references/claude-memory-location.md": "d30eb3ddbc5de81fe1e47f764639808c660c984439924bc6d0db86812b54a19d"
+  },
+  "adaptations": {
+    "tests": "Use local unittest discovery imports and retain codex-feather regression cases; simulate Windows for cross-API ctime tests.",
+    "tracking": "Retain the shared cc-feather tracking marker for cross-runtime interoperability.",
+    "ctime": "Retain codex-feather same-API ctime checks and non-Windows cross-API ctime checks; preserve prior regression tests."
+  }
+}

@@ -1,5 +1,16 @@
 # feather-handoff 驗收紀錄
 
+## cc-feather v0.10.1 Python 與 handoff 對齊（2026-10-02）
+
+來源為 sibling checkout `cc-feather`，HEAD `e72aef80c4b6d0fb32791b4d51da0b1f131642eb`。來源檔案 SHA-256 與適配說明見 [同步清單](cc-feather-handoff-manifest.json)。未修改 cc-feather、已安裝 plugin 或使用者全域設定。既有 setup 工作保留；handoff 環境測試的 bundle fixture 補上目前安裝器要求的入口模板。
+
+移植 CLI JSON 錯誤與 root 選項位置、完成保存與歸檔復原、詳細紀錄章節與 fenced baseline 保護、清除／封存 pending 與衝突檢查、追蹤選擇持久化、Git 環境隔離、linked root 與 Windows reparse 判定、寫入失敗清理及唯讀檔案錯誤。主 Agent 統一寫入、實作期間等待前更新與完成待歸檔選取規則同步至技能。
+
+Codex 適配保留：明確呼叫設定、跨 session 計畫審查紀錄，以及同一 API ctime 變動偵測；Windows 跨 API stat/fstat 的 ctime 差異仍容許。保留原有回歸案例，新增 cc-feather 的 local fixes 與 links 測試。
+
+驗證：Python 3.11.9，`python -B -m unittest discover -s tests -p 'test_handoff_*.py'` 通過 184 項（10 項環境略過）；完整 `python -B -m unittest discover -s tests` 執行 363 項（12 項略過），唯一錯誤為執行前已載入的 inode 測試替身不接受 `cross_api` 參數；修正測試替身後，上述 184 項 handoff 回歸全部通過，完整測試的其餘項目無失敗。Python 語法檢查與 `git diff --check` 通過。沒有執行新的模型行為或 live session 測試，這些結果不代表模型遵循規則的實測。
+
+
 ## cc-feather v0.7.0 新待辦規則相容（2026-10-01）
 
 主 handoff skill 納入新待辦分類、重用既有記錄、只記錄不執行、決定後清除待決項與歸檔完成回報；handoff-save 明確沿用共享分類並回報所有寫入路徑。格式、狀態、儲存位置與 Python runtime 未變更。

@@ -4,22 +4,25 @@ import sys
 import tempfile
 import os
 import subprocess
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
-from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "skills/handoff/scripts"))
 from feather_handoff import storage
 
 
-class HandoffStorageTest(unittest.TestCase):
-    def setUp(self):
-        self.temp = tempfile.TemporaryDirectory()
-        self.addCleanup(self.temp.cleanup)
-        self.path = Path(self.temp.name) / "work.md"
-        self.path.write_bytes(b"original")
-        self.original = storage.read_file(self.path)
+def skewed_fstat(**overrides):
+    real_fstat = os.fstat
 
+    def fstat(fd):
+        info = real_fstat(fd)
+        fields = {name: getattr(info, name) for name in dir(info) if name.startswith("st_")}
+        return SimpleNamespace(**{**fields, **overrides})
+    return fstat
+
+
+class HandoffStorageTest(unittest.TestCase):
     def test_windows_read_accepts_stable_ctime_difference_between_apis(self):
         fstat = os.fstat
         def changed_ctime(fd):
@@ -93,6 +96,13 @@ class HandoffStorageTest(unittest.TestCase):
                 storage.read_file(path)
             self.assertEqual(caught.exception.code, "changed")
 
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.path = Path(os.path.realpath(self.temp.name)) / "work.md"
+        self.path.write_bytes(b"original")
+        self.original = storage.read_file(self.path)
+
     def test_permission_denial_is_not_retried(self):
         with patch.object(storage.os, "open", side_effect=PermissionError("sandbox denied")) as opened:
             with self.assertRaises(PermissionError):
@@ -110,12 +120,21 @@ class HandoffStorageTest(unittest.TestCase):
             project.mkdir()
             subprocess.run(["git", "-C", str(project), "init", "--quiet"], check=True, capture_output=True)
             (project / "source.txt").write_text(project.name, encoding="utf-8")
+        self.addCleanup(storage.reset_roots)
         with patch.dict(os.environ, {"GIT_DIR": str(redirected / ".git"), "GIT_WORK_TREE": str(redirected)}):
             store = storage.Store(str(asked))
             self.assertEqual(store.project, asked.resolve())
             result = capture(store, {"paths": ["source.txt"]})
             self.assertEqual(result["snapshot"]["files"][0]["sha256"], storage.hashlib.sha256(b"asked").hexdigest())
             self.assertEqual(Path(git(store, "rev-parse", "--show-toplevel").stdout.strip()), asked)
+
+    def test_ctime_mismatch_between_stat_and_fstat_is_not_a_change(self):
+        # Python 3.12+ on Windows: stat() reports creation time, fstat() reports change time.
+        with patch.object(sys, "platform", "win32"), patch.object(storage.os, "fstat", side_effect=skewed_fstat(st_ctime_ns=0)):
+            self.assertEqual(storage.read_file(self.path).data, b"original")
+        with patch.object(storage.os, "fstat", side_effect=skewed_fstat(st_mtime_ns=0)), \
+                self.assertRaises(storage.HandoffError):
+            storage.read_file(self.path)
 
     def test_collisions_are_bounded_and_never_deleted(self):
         collision = self.path.parent / ".feather-fixed.tmp"

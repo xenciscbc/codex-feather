@@ -22,7 +22,7 @@ class HandoffArchiveTest(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
-        self.project = Path(self.temporary.name)
+        self.project = Path(os.path.realpath(self.temporary.name))
         self.directory = self.project / ".feather/handoffs"
         self.directory.mkdir(parents=True)
         self.work = self.directory / "config-audit.md"

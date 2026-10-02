@@ -63,8 +63,14 @@ def _body_start(text: str, heading_end: int) -> int:
     return heading_end + 1 if text[heading_end:heading_end + 1] == "\n" else heading_end
 
 
-def _byte_offset(text: str, character_offset: int, bom: int) -> int:
-    return bom + len(text[:character_offset].encode("utf-8"))
+def _byte_offsets(text: str, offsets: set[int], bom: int) -> dict[int, int]:
+    """Map character offsets to byte offsets in one pass over the sorted offsets."""
+    result, position, size = {}, 0, bom
+    for offset in sorted(offsets):
+        size += len(text[position:offset].encode("utf-8"))
+        position = offset
+        result[offset] = size
+    return result
 
 
 def _completion(value: str | None) -> tuple[datetime | None, str | None]:
@@ -119,6 +125,8 @@ def parse_history(snapshot: Snapshot, source: str | None = None) -> HistoryDocum
                        "message": "No recognizable history entry boundaries"})
 
     bom = 3 if snapshot.data.startswith(b"\xef\xbb\xbf") else 0
+    byte_offsets = _byte_offsets(
+        text, {len(text), *(s.start for s in starts), *(s.body_start for s in starts)}, bom)
     entries = []
     for index, start in enumerate(starts):
         end = starts[index + 1].start if index + 1 < len(starts) else len(text)
@@ -137,9 +145,8 @@ def parse_history(snapshot: Snapshot, source: str | None = None) -> HistoryDocum
                              if start.completed is not None else
                              f"feather-history-ambiguous-v1\0{source}\0{start.start}\0{text[start.start:end]}")
         identity = hashlib.sha256(identity_material.encode("utf-8")).hexdigest()
-        byte_start = _byte_offset(text, start.start, bom)
-        byte_body_start = _byte_offset(text, start.body_start, bom)
-        byte_end = _byte_offset(text, end, bom)
+        byte_start, byte_body_start, byte_end = (
+            byte_offsets[start.start], byte_offsets[start.body_start], byte_offsets[end])
         entry = HistoryEntry(
             title=start.title, completed=start.completed, source=source,
             body=text[start.body_start:end], content=text[start.start:end], identity=identity,

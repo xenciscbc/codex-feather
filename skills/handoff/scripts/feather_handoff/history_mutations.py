@@ -1,4 +1,6 @@
 """Versioned operations on explicitly selected complete history entries."""
+import re
+
 from .history import HistoryDocument, HistoryEntry, parse_history
 from .storage import HandoffError, Store, check_path, create_file, legal_name, read_file, replace_file, require_current
 from .writing import input_object
@@ -49,6 +51,7 @@ def clear_history(store: Store, raw: object) -> dict:
         raise HandoffError("conflict", "History changed or version missing; query and reconcile original selection")
     document = parse_history(original, source)
     entries = selection(document, payload.get("ids"))
+    warnings = check_pending(store, entries, document)
     expected = remainder(document, entries)
     try:
         saved = replace_file(original, expected)
@@ -60,25 +63,73 @@ def clear_history(store: Store, raw: object) -> dict:
             pass
         state = ("unreadable" if observed is None else "unchanged" if observed.data == original.data
                  else "selection-removed" if observed.data == expected else "changed")
-        return {"status": "partial", "complete": False, "code": getattr(error, "code", "clear-failed"),
-                "message": str(error), "source": source, "source_path": str(original.path), "state": state,
-                "source_version": observed.version if observed else None, "ids": payload["ids"],
-                "recovery": "Preserve the source; query and reconcile these exact identities before retrying"}
-    return {"status": "ok", "complete": True, "source": source,
-            "removed": [e.identity for e in entries], "version": saved.version}
+        result = {"status": "partial", "complete": False, "code": getattr(error, "code", "clear-failed"),
+                  "message": str(error), "source": source, "source_path": str(original.path), "state": state,
+                  "source_version": observed.version if observed else None, "ids": payload["ids"],
+                  "recovery": "Preserve the source; query and reconcile these exact identities before retrying"}
+        return with_warnings(result, warnings)
+    return with_warnings({"status": "ok", "complete": True, "source": source,
+                          "removed": [e.identity for e in entries], "version": saved.version}, warnings)
 
 
-def check_pending(store: Store, entries: list[HistoryEntry], document: HistoryDocument) -> None:
+def with_warnings(result: dict, warnings: list[str]) -> dict:
+    """Malformed unfinished works do not block clear or seal, but stay visible for a reviewed repair."""
+    if warnings:
+        result["warnings"] = list(dict.fromkeys(warnings))
+    return result
+
+
+STATUS_LINE = re.compile(r"(?m)^[ \t]*狀態[ \t]*[：:]([^\n]*)")
+# Not =======, which also underlines setext headings.
+MERGE_MARKER = re.compile(r"(?m)^(<<<<<<<|>>>>>>>|\|{7})( |\r?$)")
+
+
+def hidden_copy(text: str) -> list[str]:
+    """Why a well-formed work may still hold a second copy of a record, such as a git conflict copy.
+
+    Fences and indentation do not exempt a status line: the copy's status cannot be ruled out."""
+    reasons = []
+    if len(STATUS_LINE.findall(text)) > 1:
+        reasons.append("more than one status line")
+    if MERGE_MARKER.search(text):
+        reasons.append("merge-conflict marker line")
+    return reasons
+
+
+def unfinished_status(text: str) -> str | None:
+    """The status of a malformed work that cannot be an unfinished archival, else None.
+
+    Only a work whose title is on the first line and whose whole text has exactly one status line, reading
+    進行中 or 受阻, qualifies; anything else (missing or displaced title, merge-conflict copies) stays unknown."""
+    if not re.match(r"# (.+)$", text, re.M):
+        return None
+    lines = STATUS_LINE.findall(text)
+    if len(lines) != 1 or lines[0].strip() not in {"進行中", "受阻"}:
+        return None
+    return lines[0].strip()
+
+
+def check_pending(store: Store, entries: list[HistoryEntry], document: HistoryDocument) -> list[str]:
+    """Refuse while a completed work may still need archival; returns warnings for malformed unfinished works."""
     from .archiving import same_body, work_body
     from .records import summary
     paths = store.work_paths()
     snapshots = []
+    warnings = []
     for path in paths:
         try:
             snapshot = read_file(path)
             item = summary(snapshot)
             if item["problems"]:
-                raise HandoffError("pending-archive", f"Cannot exclude unfinished archival for {path}")
+                status = unfinished_status(snapshot.text)
+                if status is None:
+                    raise HandoffError("pending-unknown", f"{path}: {'; '.join(item['problems'])}; "
+                                       "cannot rule out an unfinished archival")
+                # Still re-checked below, so a concurrent change is not missed.
+                snapshots.append(snapshot)
+                warnings.append(f"{path}: {'; '.join(item['problems'])}; not pending archival "
+                                f"(its only status line is {status})")
+                continue
             snapshots.append(snapshot)
             for entry in entries:
                 if (item["status"] == "完成" and item["title"] == entry.title
@@ -87,12 +138,18 @@ def check_pending(store: Store, entries: list[HistoryEntry], document: HistoryDo
                     if not same_body(entry, body, document):
                         raise HandoffError("conflict", f"Completed work and history differ: {path}")
                     raise HandoffError("pending-archive", f"Retry archival before sealing: {path}")
+            # After the identity check, so pending-archive and conflict for a selected completion keep precedence.
+            reasons = hidden_copy(snapshot.text)
+            if reasons:
+                raise HandoffError("pending-unknown", f"{path}: {'; '.join(reasons)}; "
+                                   "cannot rule out an unfinished archival")
         except (OSError, UnicodeError) as error:
-            raise HandoffError("pending-archive", f"Cannot exclude unfinished archival for {path}: {error}") from error
+            raise HandoffError("pending-unknown", f"{path}: {error}; cannot rule out an unfinished archival") from error
     if paths != store.work_paths():
         raise HandoffError("pending-archive", "Work directory changed; repeat pending archival check")
     for snapshot in snapshots:
         require_current(snapshot)
+    return warnings
 
 
 def seal_history(store: Store, raw: object) -> dict:
@@ -132,7 +189,7 @@ def seal_history(store: Store, raw: object) -> dict:
         candidate = "# 交接歷史\n\n".encode("utf-8") + b"".join(e.content_bytes for e in entries)
         if existing is not None and existing.data != candidate:
             raise HandoffError("conflict", f"Different destination preserved: {destination}")
-    check_pending(store, target_entries, target_document)
+    warnings = check_pending(store, target_entries, target_document)
     saved = existing
     try:
         if saved is None:
@@ -140,15 +197,16 @@ def seal_history(store: Store, raw: object) -> dict:
         require_current(saved)
         if read_file(destination).data != candidate:
             raise HandoffError("conflict", "Destination verification failed")
-        check_pending(store, target_entries, target_document)
+        warnings += check_pending(store, target_entries, target_document)
         source = replace_file(original, remainder(document, entries))
         require_current(saved)
         require_current(source)
     except (OSError, ValueError) as error:
-        return {"status": "partial", "complete": False, "code": getattr(error, "code", "seal-failed"),
-                "message": str(error), "source": "history.md", "destination": str(destination),
-                "destination_version": saved.version if saved else None,
-                "ids": payload["ids"], "recovery": "Preserve copies; query source version and retry the same destination and identities"}
-    return {"status": "ok", "complete": True, "source": "history.md", "version": source.version,
-            "destination": str(destination), "destination_version": saved.version,
-            "sealed": [e.identity for e in target_entries]}
+        result = {"status": "partial", "complete": False, "code": getattr(error, "code", "seal-failed"),
+                  "message": str(error), "source": "history.md", "destination": str(destination),
+                  "destination_version": saved.version if saved else None,
+                  "ids": payload["ids"], "recovery": "Preserve copies; query source version and retry the same destination and identities"}
+        return with_warnings(result, warnings)
+    return with_warnings({"status": "ok", "complete": True, "source": "history.md", "version": source.version,
+                          "destination": str(destination), "destination_version": saved.version,
+                          "sealed": [e.identity for e in target_entries]}, warnings)

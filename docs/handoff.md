@@ -131,3 +131,12 @@ Claude memory 情境也使用同一入口：基本搜尋包含 `claude-memory-di
 `claude-memory-links-alias` 會建立指向專案外的目錄連結，並另外保存連結身份；因此即使替換後的目標檔案位元完全相同，`check` 也會拒絕。平台不允許建立該 symlink／reparse fixture 時，prepare 會明確回報情境未建立，測試也應標示跳過，不能宣稱通過別名越界行為。
 
 `claude-memory-project-non-git` 必須在 Git repository 外的暫存目錄 prepare，否則素材實際上會成為外層 repository 的子目錄，入口會拒絕。專案定位的其他情境名稱與原生回覆驗收準則可從 prepare 的 `--help` 及產生的 `review.json` 查閱。Claude memory 的實際結果見 [外部交接驗收紀錄](claude-memory-validation.md)；既有 Feather 行為見 [交接驗收紀錄](handoff-validation.md)。
+
+
+## cc-feather v0.10.1 對齊
+
+Python 工具與交接格式對齊 cc-feather v0.10.1，可沿用同一專案的 `.feather/handoffs`。CLI 的 `--project` 與 `--exact-root` 可放在子命令前後，使用錯誤也會回傳 JSON。詳細紀錄更新會保護後續章節與檔案基準；完成保存與歸檔失敗會回報已保存的狀態與復原方式，避免重複完成身份。清除或封存會檢查可能尚未歸檔的工作與衝突標記。
+
+交接寫入由主 Agent 統一執行。實作已獲授權且已有交接時，在停下等待使用者前更新結論、待答問題與下一步；沒有新進展時略過。完成待歸檔的工作不會被當作未完成工作接續。Codex 的明確技能呼叫與跨 session 計畫審查紀錄規則維持原有行為。
+
+指定 Git 追蹤後，工具保留共用的 `# cc-feather: track /.feather/handoffs/` 註解，讓兩邊後續預設保存都尊重此選擇。Windows 的跨 API ctime 差異仍被容許，同一 API 的讀取前後變動檢查保留。來源與移植差異見 [同步清單](cc-feather-handoff-manifest.json)。

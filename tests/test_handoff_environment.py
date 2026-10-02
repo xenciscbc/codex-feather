@@ -29,11 +29,16 @@ class HandoffEnvironmentTest(unittest.TestCase):
         skill = self.bundle / "assets/skills/handoff/SKILL.md"
         skill.parent.mkdir(parents=True)
         shutil.copyfile(ROOT / "skills/handoff/SKILL.md", skill)
+        entrance_source = "assets/templates/entrances/handoff.md"
+        entrance = self.bundle / entrance_source
+        entrance.parent.mkdir(parents=True)
+        shutil.copyfile(ROOT / "templates/entrances/handoff.md", entrance)
         source = "assets/skills/handoff/SKILL.md"
         self.bundle.joinpath("bundle.json").write_text(json.dumps({
             "format": 1,
             "version": "0.1.0",
-            "files": {source: hashlib.sha256(skill.read_bytes()).hexdigest()},
+            "files": {source: hashlib.sha256(skill.read_bytes()).hexdigest(),
+                      entrance_source: hashlib.sha256(entrance.read_bytes()).hexdigest()},
             "components": {"handoff": {"files": {
                 source: ".agents/skills/handoff/SKILL.md",
             }}},

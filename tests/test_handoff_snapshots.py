@@ -12,11 +12,12 @@ import unittest
 from unittest.mock import patch
 
 import test_handoff_tool as handoff_tests
+from test_handoff_storage import skewed_fstat
 RECORD = handoff_tests.RECORD
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "skills/handoff/scripts"))
 from feather_handoff import baseline, observations
-from feather_handoff.storage import HandoffError, Store
+from feather_handoff.storage import HandoffError, Store, reset_roots
 
 
 class HandoffSnapshotsTest(unittest.TestCase):
@@ -226,12 +227,6 @@ class HandoffSnapshotsTest(unittest.TestCase):
 
 
 class ObservationUnitTest(unittest.TestCase):
-    def setUp(self):
-        self.temp = tempfile.TemporaryDirectory()
-        self.addCleanup(self.temp.cleanup)
-        self.project = Path(self.temp.name)
-        self.store = SimpleNamespace(project=self.project)
-
     def test_windows_capture_accepts_stable_ctime_difference_between_apis(self):
         (self.project / "a").write_bytes(b"original")
         fstat = os.fstat
@@ -313,6 +308,12 @@ class ObservationUnitTest(unittest.TestCase):
             self.assertFalse(result["complete"])
             self.assertEqual(result["snapshot"]["files"][0]["reason"], "changed")
 
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.project = Path(os.path.realpath(self.temp.name))
+        self.store = SimpleNamespace(project=self.project)
+
     def test_full_observation_matrix(self):
         examples = {"present": {"state": "present", "sha256": "a"}, "missing": {"state": "missing"},
                     "unknown": {"state": "unknown", "reason": "unreadable"}}
@@ -340,6 +341,16 @@ class ObservationUnitTest(unittest.TestCase):
             self.assertEqual(observations.observe(self.project, "a", [1])[0]["reason"], "changed")
             self.assertEqual(probe.call_count, 2)
 
+    def test_ctime_mismatch_between_stat_and_fstat_is_present(self):
+        # Python 3.12+ on Windows: stat() reports creation time, fstat() reports change time.
+        (self.project / "a").write_bytes(b"1234")
+        with patch.object(sys, "platform", "win32"), patch.object(observations.os, "fstat", side_effect=skewed_fstat(st_ctime_ns=0)):
+            item, _ = observations.observe(self.project, "a", [100])
+        self.assertEqual(item, {"path": "a", "state": "present", "sha256": hashlib.sha256(b"1234").hexdigest()})
+        with patch.object(observations.os, "fstat", side_effect=skewed_fstat(st_mtime_ns=0)):
+            item, _ = observations.observe(self.project, "a", [100])
+        self.assertEqual(item["reason"], "changed")
+
     def test_batch_and_git_changes_are_partial(self):
         (self.project / "a").write_bytes(b"a")
         original = observations.source_info
@@ -358,6 +369,7 @@ class ObservationUnitTest(unittest.TestCase):
         self.assertFalse(result["complete"])
 
     def test_comparison_detects_handoff_version_change(self):
+        self.addCleanup(reset_roots)
         store = Store(str(self.project))
         path = store.directory / "w.md"
         path.parent.mkdir(parents=True)
@@ -385,6 +397,7 @@ class ObservationUnitTest(unittest.TestCase):
     def test_git_trust_failure_is_not_overridden_during_root_discovery_or_capture(self):
         (self.project / "a").write_bytes(b"a")
         denied = subprocess.CompletedProcess([], 128, "", "fatal: detected dubious ownership in repository")
+        self.addCleanup(reset_roots)
         with patch.object(subprocess, "run", return_value=denied) as git:
             store = Store(str(self.project))
             result = observations.capture(store, {"paths": ["a"]})
@@ -398,6 +411,7 @@ class ObservationUnitTest(unittest.TestCase):
 
     def test_tracking_failure_reports_saved_baseline_and_version(self):
         from feather_handoff.writing import create_work
+        self.addCleanup(reset_roots)
         store = Store(str(self.project))
         (self.project / "a").write_bytes(b"a")
         with patch.object(observations, "git_observation", return_value={"state": "not-repository"}):

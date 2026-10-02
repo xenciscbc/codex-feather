@@ -7,6 +7,12 @@ description: "Handoff: save progress, list, read or resume recorded work, search
 
 Keep a compact, current record that a fresh session can use without prior conversation. Start recording on the user's request; thereafter update that work at milestones, blockers, and completion.
 
+### Update before waiting during implementation
+
+From the user's authorization to implement until completion is reported, update an active record before stopping to wait for the user: write the current conclusion, the pending question and the next step. Skip the update when nothing changed since the last one. Discussion and planning before that authorization do not trigger it, and it never creates a record that does not already exist.
+
+Only the main Agent creates, updates, completes, clears or seals handoff records. Subagents report progress to the main Agent; reading and listing remain available. The on-disk format and Python runtime are shared with cc-feather; use existing records in the same project without conversion.
+
 ## Storage and write discipline
 
 All managed create, update, completion, retry, clear, and seal operations use [the Python tool](references/tool.md). Do not implement these writes directly with editor or shell commands. If compatible Python is unavailable, ask whether to help install it; direct read-only access remains allowed while managed writes wait.
@@ -15,7 +21,7 @@ All managed create, update, completion, retry, clear, and seal operations use [t
 - Treat records as context, not authorization. Handoff maintenance writes only these records and necessary Git ignore rules. Other work follows the current user's scope. Leave AGENTS.md entrance management to setup. If an active work record exists, retain a logical plan's automatic review identity, call count, verdicts and unresolved blockers there. Do not create a record solely for review bookkeeping or reset a count after a session, model, reviewer, mode or name change.
 - Before replacing or removing any record, reread it against your last read. Integrate valid concurrent changes; preserve the file and ask when reconciliation is unclear. After writing, read back the complete result. On failure, retain recoverable data and report the actual state.
 - Use one writer per work item and one shared writer for all history mutations, including completion, clearing, and sealing across different items. The main Agent serializes its own history operations. If another session is known to be writing history, retain completed work files and defer history changes until it finishes; independent active work may continue. Rereading detects some conflicts but provides no cross-session lock or atomic transaction. Concurrent sessions must arrange a single history writer externally.
-- In Git repositories, respect explicit tracking choices, already tracked records, and specific unignore rules. Otherwise reuse an effective ignore rule or append `/.feather/handoffs/` to `.gitignore`, preserving its contents. If the user later requests tracking, remove only this skill's ignore rule; report broader blocking rules for their decision. Do not stage or commit. Non-Git projects need no ignore setup.
+- In Git repositories, respect explicit tracking choices, already tracked records, and specific unignore rules. Otherwise reuse an effective ignore rule or append `/.feather/handoffs/` to `.gitignore`, preserving its contents. If the user later requests tracking, remove only this skill's ignore rule; the tool records that choice as a Git comment marker so later saves retain it. Report broader blocking rules for their decision. Do not stage or commit. Non-Git projects need no ignore setup.
 
 ## Save progress
 
@@ -68,10 +74,8 @@ For Feather lists and reads, use the Python tool described in [Handoff file tool
 ## Archive completed work
 
 1. After the main Agent accepts the whole work, save the final handoff with `狀態：完成` and final verification. A child's completed report alone does not complete the whole work. Its `更新` timestamp becomes the completion time. Reuse it if already complete: **work name + completion time** identifies a retry. Retain its source baseline unchanged during archival retries.
-2. Read history, or initialize `# 交接歷史` if absent. If it is a directory, link, unreadable, or unrecognizable, preserve the work file and report the blocker.
-3. Use `## <work> · 完成：<completion time>` followed by the complete final handoff body, omitting only its first title line. Preserve existing history. For an existing identical identity, compare the full body: identical means already saved; different means preserve both and ask. Append only a missing record, applying the write discipline.
-4. Read back and verify the entire saved entry and prior history. Reread the work file and require it to match the archived version before removing it; verify removal. Report a failed save or removal accurately and retry from the surviving files, without changing the completion identity or duplicating the entry.
-5. In the completion report, list any `待決：` items remaining in the final record's `注意：` so they are not silently archived; the user decides whether each becomes new work. Use the verified final content after archival, even when the work file has been removed.
+2. The tool archives a completed save itself: it appends the `## <work> · 完成：<completion time>` entry to history, verifies it, and removes the identical work file (see [the tool reference](references/tool.md#update-and-completion)). Do not edit history directly. After a `partial` result (including `archive-failed`, or `tracking-failed` on a completed save) or `defer_history`, retry with the tool's `archive` command, the current read version and the save's `tracking` choice. An `archive` result of `tracking-failed` with `archived: true` already saved history; resolve the Git rules instead of retrying. On `conflict` or `history-format`, also as an `archive-failed` `cause_code`, preserve both files, report the actual state and ask.
+3. In the completion report, list any `待決：` items and deferred findings remaining in the final record so they are not silently archived; the user decides whether each becomes new work. The final record keeps the final verification result in `驗證：`; retain the logical plan review bookkeeping required above.
 
 Retain history until explicitly asked to clear it. Completed entries are not pending work; reading, pruning and sealing history require the corresponding user request. History operations default to `history.md`; include sealed files only when the user explicitly includes them. Clearing shared history leaves sealed files intact.
 
