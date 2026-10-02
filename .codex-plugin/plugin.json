@@ -1,6 +1,6 @@
 {
   "name": "codex-feather",
-  "version": "1.6.4",
+  "version": "1.6.5",
   "description": "Delegate bounded work and preserve resumable handoffs, with guided setup for native Codex roles.",
   "author": {
     "name": "xenciscbc"
