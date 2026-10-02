@@ -8,6 +8,19 @@ from .transaction import Plan
 from .conflicts import ConflictError
 
 
+def matching_block(content: bytes, recorded: bytes) -> bytes | None:
+    """Accept line-ending conversion alone, preserving the actual byte span."""
+    normalized = recorded.replace(b"\r\n", b"\n")
+    variants = {recorded, normalized, normalized.replace(b"\n", b"\r\n")}
+    matches = [variant for variant in variants if variant and content.count(variant) == 1]
+    return matches[0] if len(matches) == 1 else None
+
+
+def line_endings(block: bytes, content: bytes) -> bytes:
+    normalized = block.replace(b"\r\n", b"\n")
+    return normalized.replace(b"\n", b"\r\n") if b"\r\n" in content else normalized
+
+
 def instruction(bundle: Bundle, component: str, overrides: dict | None = None,
                 review_mode: str | None = None) -> str:
     body = bundle.payload[f"assets/templates/entrances/{component}.md"].decode("utf-8-sig").strip()
@@ -54,7 +67,7 @@ def inspect(environment: Environment, component: str, link: dict[str, str]) -> d
     status = "installed"
     if content is None:
         status = "missing"
-    elif (content.count(old["content"].encode()) != 1 or content.count(begin) != 1 or content.count(end) != 1
+    elif (matching_block(content, old["content"].encode()) is None or content.count(begin) != 1 or content.count(end) != 1
           or owner not in old["owners"]):
         status = "conflict"
     elif old["file"] == "AGENTS.md" and plan.read(root / "AGENTS.override.md") is not None:
@@ -102,9 +115,13 @@ def _replace_content(plan: Plan, entrance: tuple, content: str) -> None:
     before_block = entry["content"].encode()
     after_block = content.encode()
     file_content = plan.read(target)
-    if file_content is None or file_content.count(before_block) != 1:
+    if file_content is None:
         raise ValueError(f"Managed entrance changed: {target}")
-    plan.add(target, file_content.replace(before_block, after_block, 1))
+    actual = matching_block(file_content, before_block)
+    if actual is None:
+        raise ValueError(f"Managed entrance changed: {target}")
+    after_block = line_endings(after_block, file_content)
+    plan.add(target, file_content.replace(actual, after_block, 1))
     entry["content"] = after_block.decode()
     plan.add(ledger_path, (json.dumps(ledger, indent=2) + "\n").encode())
 
@@ -141,8 +158,10 @@ def manage(plan: Plan, environment: Environment, bundle: Bundle, component: str,
     begin = f"<!-- feather-setup:{component}:begin -->".encode()
     end = f"<!-- feather-setup:{component}:end -->".encode()
     block = b"\n\n" + begin + b"\n" + instruction(bundle, component, overrides, review_mode).encode() + b"\n" + end + b"\n"
+    block = line_endings(block, current)
     if old:
         prior = old["content"].encode()
+        actual = matching_block(current, prior)
         # Existing role owners can upgrade shared guidance; joining or reused owners
         # cannot replace its model table with defaults from a different bundle.
         if (component == "delegation" and not remove and transfer_to is None
@@ -153,7 +172,13 @@ def manage(plan: Plan, environment: Environment, bundle: Bundle, component: str,
                 raise ValueError(f"Delegation entrance cannot be shared or rewritten with different review modes: {target}")
             if values(prior.decode(), allow_legacy=True) != values(block.decode(), allow_legacy=True):
                 raise ValueError(f"Delegation entrance cannot be shared or rewritten with different model defaults: {target}")
-        if current.count(begin) != 1 or current.count(end) != 1 or current.count(prior) != 1:
+        missing_block = begin not in current and end not in current
+        if (missing_block and owner in old["owners"] and transfer_to is None
+                and (remove or replace)):
+            # Nothing remains to delete. Explicit replacement may restore a wholly
+            # absent block, but must never guess the bounds of a partial block.
+            prior = b""
+        elif current.count(begin) != 1 or current.count(end) != 1 or actual is None:
             if current.count(begin) != 1 or current.count(end) != 1 or not replace:
                 raise ConflictError(target, prior, current, None if remove else block)
             start, stop = current.index(begin), current.index(end) + len(end)
@@ -161,7 +186,10 @@ def manage(plan: Plan, environment: Environment, bundle: Bundle, component: str,
                 raise ConflictError(target, prior, current, None if remove else block)
             # Replace only the recognizable marker-bounded span; changed outside whitespace stays owned by the user.
             prior = current[start:stop]
-            block = block.removeprefix(b"\n\n").removesuffix(b"\n")
+            newline = b"\r\n" if b"\r\n" in block else b"\n"
+            block = block.removeprefix(newline * 2).removesuffix(newline)
+        else:
+            prior = actual
         owners = set(old["owners"])
         if transfer_to is not None:
             if owner not in owners:
@@ -180,7 +208,7 @@ def manage(plan: Plan, environment: Environment, bundle: Bundle, component: str,
                 del ledger["blocks"][component]
         else:
             owners.add(owner)
-            current = current.replace(prior, block, 1)
+            current = current + block if missing_block else current.replace(prior, block, 1)
             old.update(content=block.decode(), owners=sorted(owners), version=bundle.version)
     elif remove:
         raise ValueError(f"Missing entrance ownership record: {target}")
@@ -194,7 +222,7 @@ def manage(plan: Plan, environment: Environment, bundle: Bundle, component: str,
     delete_empty = not current and ledger.get("created_files", {}).get(filename, False)
     if not any(record["file"] == filename for record in ledger["blocks"].values()):
         ledger.get("created_files", {}).pop(filename, None)
-    plan.add(target, None if delete_empty else current)
+    plan.add(target, None if delete_empty or (before is None and not current) else current)
     plan.add(ledger_path, (json.dumps(ledger, indent=2) + "\n").encode())
     return {"scope": scope, "path": str(target), "status": "removed" if remove else "managed",
             "load_condition": "Codex document limits, deeper instructions and project trust still apply"}

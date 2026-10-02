@@ -324,6 +324,8 @@ class PluginSetupTest(unittest.TestCase):
         agents = (self.project / "AGENTS.md").read_text(encoding="utf-8")
         self.assertIn("feather-setup:handoff:begin", agents)
         self.assertIn("meaningful milestones, blockers, and completion", agents)
+        self.assertIn("Only the main Agent writes handoff records", agents)
+        self.assertIn("before stopping to wait for the user", agents)
         checked = self.assert_success(self.run_setup("check", "--components", "handoff"))
         self.assertEqual(checked["components"]["handoff"]["status"], "installed")
         self.assertEqual(checked["components"]["handoff"]["provider"]["session"], "unconfirmed")
@@ -331,6 +333,21 @@ class PluginSetupTest(unittest.TestCase):
         self.assertEqual((self.project / "AGENTS.md").read_text(encoding="utf-8"), self.existing_agents)
         self.assertEqual((self.project / ".feather/handoffs/work.md").read_text(), "My handoff data\n")
         self.assertEqual(self.plugin_files(), source_before)
+
+    def test_plugin_handoff_update_and_remove_after_crlf_conversion(self):
+        self.assert_success(self.run_setup("install", "--components", "handoff"))
+        target = self.project / "AGENTS.md"
+        target.write_bytes(target.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n"))
+        before_data = (self.project / ".feather/handoffs/work.md").read_bytes()
+        checked = self.assert_success(self.run_setup("check", "--components", "handoff"))
+        self.assertEqual(checked["entrances"]["handoff"]["status"], "installed")
+        template = self.plugin / "templates/entrances/handoff.md"
+        template.write_text(template.read_text(encoding="utf-8") + "\nUpdated maintenance rule.\n", encoding="utf-8")
+        self.assert_success(self.run_setup("update", "--components", "handoff"))
+        self.assertIn(b"Updated maintenance rule.\r\n", target.read_bytes())
+        self.assert_success(self.run_setup("remove", "--components", "handoff"))
+        self.assertEqual(target.read_bytes(), self.existing_agents.replace("\n", "\r\n").encode("utf-8"))
+        self.assertEqual((self.project / ".feather/handoffs/work.md").read_bytes(), before_data)
 
     def test_all_components_are_independent_and_remove_is_partial(self):
         self.assert_success(self.run_setup("install", "--components", "all"))

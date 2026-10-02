@@ -70,7 +70,7 @@ class Bundle:
                     raise ValueError(f"Unverified payload: {source}")
                 validate_target(name, target, bundled=True)
                 if name == "delegation" and target == DELEGATION_SKILL:
-                    if not payload[source].startswith(b"---\nname: feather-delegation\n"):
+                    if not payload[source].replace(b"\r\n", b"\n").startswith(b"---\nname: feather-delegation\n"):
                         raise ValueError(f"Invalid delegation runtime skill: {source}")
                 if name == "delegation" and target != DELEGATION_SKILL:
                     role = tomllib.loads(payload[source].decode("utf-8-sig"))

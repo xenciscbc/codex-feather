@@ -1,5 +1,25 @@
 # feather-setup 驗證紀錄
 
+## Handoff setup 生命週期對齊 cc-feather v0.10.1（2026-10-02）
+
+比對來源為 sibling cc-feather `e72aef80c4b6d0fb32791b4d51da0b1f131642eb` 的 handoff 維護模板與 setup 區塊換行處理。Codex 保留 `AGENTS.md`／`AGENTS.override.md`、provider、scope、standalone 部署與既有所有權模型。
+
+入口模板補上主 Agent 統一寫入及實作期間等待使用者前更新既有交接的規則；讀取或列出不啟動維護。入口檢查、更新與移除接受純 LF／CRLF 轉換，新增／更新區塊沿用現有文件換行，區塊外原始位元組保留。其他入口文字修改仍是衝突。共用 model/review 的入口寫入也使用相同區塊比對及換行處理。
+
+一併驗證既有未提交 setup 修正：完整入口已消失時，移除只解除所有權且不重建已刪除文件；更新須明確 replace 才補回；缺單邊標記仍拒絕 replace。Bundle 的 delegation skill 格式驗證接受 CRLF。Plugin handoff 僅管理入口，更新／移除保持既有 provider 並保留交接資料與未選取元件。
+
+Python 3.11.9，來源 CLI 隔離驗證：
+
+| 驗證 | 結果 |
+| --- | --- |
+| `python -B -m unittest discover -s tests -p 'test_setup.py'` | 72 項，70 通過、2 條件略過 |
+| `python -B -m unittest discover -s tests -p 'test_plugin_setup.py'` | 28 項全部通過 |
+| model、review settings、transaction modes、provider scope、short-name upgrade、snapshot deployment、interactive setup、handoff environment | 52 項全部通過 |
+| 安裝器 Python 語法檢查、`git diff --check` | 通過 |
+
+本輪共 152 項，150 通過、2 略過，無失敗。未重建獨立發行包或更新真實使用者安裝；未執行新的模型行為測試。
+
+
 ## 重建發行包（2026-09-09）
 
 新版輸出至 `dist/2026-09-09/`，版本沿用 0.1.0，以日期目錄區分本次重建。`dist/` 根目錄的舊包保留，仍符合原有 SHA-256。本次使用目前工作目錄來源，包含新版交接搜尋／封存規則與環境健檢；每包 `bundle.json` 記錄 6 份素材與 16 份安裝器／建置來源雜湊，兩平台的素材及來源雜湊完全一致。

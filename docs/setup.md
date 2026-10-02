@@ -113,7 +113,7 @@ Plugin 的自動計畫審查模式由 `$auto-on` 和 `$auto-off` 切換；sessio
 ./feather-setup.exe remove --project 'D:/work/my-project' --components handoff --scope project
 ```
 
-更新與移除先比對上次安裝內容；預設衝突即停止，列出目前修改與 proposed diff。`replace` 只允許處理有所有權紀錄的內容，不能強制接管來源不明的同名檔案。移除也支援明確的 `--on-conflict replace`，先備份再刪除手改的受管理內容。入口標記缺少、重複或範圍不明時，即使選 replace 也不任意刪除整份指引；須先整理標記或還原原區塊，再預覽操作。
+更新與移除先比對上次安裝內容；預設衝突即停止，列出目前修改與 proposed diff。`replace` 只允許處理有所有權紀錄的內容，不能強制接管來源不明的同名檔案。移除也支援明確的 `--on-conflict replace`，先備份再刪除手改的受管理內容。若受管理入口的起訖標記都已不存在，移除只解除該安裝的所有權紀錄，保留現有指引；更新須明確指定 `--on-conflict replace` 才會在文件末尾補回區塊。僅缺單邊標記、重複或範圍不明時，即使選 replace 也不任意刪除整份指引；須先整理標記或還原原區塊，再預覽操作。遷移仍要求來源區塊完整。 入口檢查、更新及移除接受純 LF／CRLF 換行轉換；其他內容變更仍依衝突規則處理。新入口與更新區塊沿用現有文件的換行，保留區塊外的原始內容。
 
 不遞迴刪除元件目錄。額外檔案、未選元件、既有 Codex 設定、`.feather/handoffs/` 與交接歷史保持完整。空目錄、安裝紀錄和備份可能保留，供後續核對；不將「資料夾仍存在」視為元件仍可用。
 
@@ -139,3 +139,10 @@ python scripts/build_setup.py
 ```
 
 在 Windows 建 Windows 包，在 Linux 建 Linux 包，不做跨平台假打包。輸出目錄必須尚不存在，可用 `--output` 指定新目錄。`--prepare-only` 只產生素材，供 `python scripts/feather_setup.py ... --bundle <素材目錄>` 開發用，不能當作無 Python 的發行包。`--bundle` 是進階素材來源選項；一般使用預設的執行檔所在完整包。
+
+
+## Handoff 維護入口更新
+
+Plugin 的 handoff 安裝只建立所選範圍的維護入口；技能由 plugin 提供。更新入口會帶入主 Agent 統一寫入，以及實作已獲授權且已有交接時，在停下等待使用者前保存結論、問題與下一步的規則。讀取或列出交接不會啟動或恢復維護。Plugin 更新後，對要更新的既有安裝範圍執行 setup `update --components handoff`。
+
+移除 plugin-backed handoff 只清除受管理入口及安裝紀錄；standalone 移除會依所有權清除其部署檔案。兩者都保留 `.feather/handoffs/` 下的工作、歷史與封存，以及未選取的 delegation 設定。Provider 與 scope 不因一般更新而切換。

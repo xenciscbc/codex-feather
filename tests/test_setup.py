@@ -88,6 +88,90 @@ class SetupTest(unittest.TestCase):
         self.assertIn("Updated handoff guidance.", target.read_text(encoding="utf-8"))
         self.assertEqual(target.read_text().count("feather-setup:handoff:begin"), 1)
 
+    def test_remove_absent_entrance_preserves_unrelated_content(self):
+        self.assertEqual(self.run_setup("install", "--components", "handoff", "--entrance", "project").returncode, 0)
+        target = self.project / "AGENTS.md"
+        unrelated = b"\xef\xbb\xbfPersonal instructions\r\n"
+        target.write_bytes(unrelated)
+        result = self.run_setup("remove", "--components", "handoff")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(target.read_bytes(), unrelated)
+        state = json.loads((self.project / ".feather/setup/state.json").read_text())
+        self.assertNotIn("handoff", state["components"])
+
+    def test_remove_absent_entrance_does_not_recreate_file(self):
+        self.assertEqual(self.run_setup("install", "--components", "handoff", "--entrance", "project").returncode, 0)
+        target = self.project / "AGENTS.md"
+        target.unlink()
+        result = self.run_setup("remove", "--components", "handoff")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(target.exists())
+
+    def test_restore_absent_entrance_requires_replace_and_preserves_prefix(self):
+        self.assertEqual(self.run_setup("install", "--components", "handoff", "--entrance", "project").returncode, 0)
+        target = self.project / "AGENTS.md"
+        unrelated = b"\xef\xbb\xbfPersonal instructions\r\n"
+        target.write_bytes(unrelated)
+        self.assertNotEqual(self.run_setup("update", "--components", "handoff").returncode, 0)
+        self.assertEqual(target.read_bytes(), unrelated)
+        result = self.run_setup("update", "--components", "handoff", "--on-conflict", "replace")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(target.read_bytes().startswith(unrelated))
+        self.assertEqual(target.read_bytes().count(b"<!-- feather-setup:handoff:begin -->"), 1)
+
+    def test_partial_entrance_still_refuses_replace(self):
+        self.assertEqual(self.run_setup("install", "--components", "handoff", "--entrance", "project").returncode, 0)
+        target = self.project / "AGENTS.md"
+        partial = b"Personal instructions\n<!-- feather-setup:handoff:begin -->\nCustom text\n"
+        target.write_bytes(partial)
+        for action in ("update", "remove"):
+            result = self.run_setup(action, "--components", "handoff", "--on-conflict", "replace")
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(target.read_bytes(), partial)
+
+    def test_delegation_bundle_accepts_crlf(self):
+        self.add_delegation()
+        skill = self.bundle / "assets/templates/feather-delegation/SKILL.md"
+        skill.write_bytes(skill.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n"))
+        self.write_manifest()
+        result = self.run_setup("install", "--components", "delegation")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.project / ".agents/skills/feather-delegation/SKILL.md").read_bytes(), skill.read_bytes())
+
+    def test_handoff_lifecycle_accepts_line_ending_conversion(self):
+        for initial, converted in ((b"\n", b"\r\n"), (b"\r\n", b"\n")):
+            with self.subTest(initial=initial):
+                target = self.project / "AGENTS.md"
+                original = b"\xef\xbb\xbfPersonal instructions" + initial
+                target.write_bytes(original)
+                self.assertEqual(self.run_setup("install", "--components", "handoff", "--entrance", "project").returncode, 0)
+                installed = target.read_bytes()
+                if initial == b"\r\n":
+                    self.assertNotIn(b"\n", installed.replace(b"\r\n", b""))
+                target.write_bytes(installed.replace(b"\r\n", b"\n").replace(b"\n", converted))
+                checked = self.run_setup("check", "--components", "handoff")
+                self.assertEqual(checked.returncode, 0, checked.stderr)
+                template = self.bundle / "assets/templates/entrances/handoff.md"
+                template.write_text("Updated handoff guidance.\n", encoding="utf-8")
+                self.write_manifest()
+                updated = self.run_setup("update", "--components", "handoff")
+                self.assertEqual(updated.returncode, 0, updated.stderr)
+                self.assertIn(b"Updated handoff guidance." + converted, target.read_bytes())
+                removed = self.run_setup("remove", "--components", "handoff")
+                self.assertEqual(removed.returncode, 0, removed.stderr)
+                self.assertEqual(target.read_bytes(), b"\xef\xbb\xbfPersonal instructions" + converted)
+
+    def test_line_ending_conversion_does_not_hide_customized_handoff(self):
+        self.assertEqual(self.run_setup("install", "--components", "handoff", "--entrance", "project").returncode, 0)
+        target = self.project / "AGENTS.md"
+        changed = target.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
+        changed = changed.replace(b"When the user", b"Whenever the user", 1)
+        target.write_bytes(changed)
+        for action in ("update", "remove"):
+            result = self.run_setup(action, "--components", "handoff")
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(target.read_bytes(), changed)
+
     def test_missing_handoff_template_rejects_install_without_writes(self):
         (self.bundle / "assets/templates/entrances/handoff.md").unlink()
         self.write_manifest()
