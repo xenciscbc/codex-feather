@@ -1,5 +1,22 @@
 # feather-handoff 驗收紀錄
 
+## cc-feather v0.16.0 Python 與 handoff 對齊（2026-10-08）
+
+遠端 `main` 比對基準為 `da4948c53f72e0c198dcdc00dd8e48ef3a43c16d`（v0.16.0）；本機 sibling checkout 仍為 v0.14.0，因此本次使用隔離副本。相對上次 `e72aef8`，handoff 程式與測試更新來自 `de7562a`。來源檔案 SHA-256、前次基準與 Codex 適配見 [同步清單](cc-feather-handoff-manifest.json)。
+
+同步四個 runtime 模組及工具參考：CommonMark ATX 章節邊界辨識（縮排、Tab、空標題）、空白工作標題回報格式問題，以及 Git ignore 規則／marker 的前導與行尾空白判定。移入六項上游回歸案例，另補一項基準替換保留 ATX 相鄰章節的測試，涵蓋 LF／CRLF。主 handoff skill 補齊歷史標題選取與工具驅動的清除／封存復原指引。
+
+保留 Codex 的入口與計畫審查紀錄、既有 Windows stat/fstat 適配及較完整的同 API ctime 檢查；共享 runtime 僅 `storage.py`、`observations.py` 與上游不同。上游 Claude 專用 `feather_config.py` 的 Bedrock 模型名稱與 YAML frontmatter 修復不適用於 Codex 的 Markdown dispatch 設定；delegation 審查流程更新不屬於本次 handoff 同步範圍。
+
+驗證環境：Windows、Python 3.11.9。結果：
+
+- `python -B -m unittest discover -s tests -p 'test_handoff_*.py' -v`：190 項，結果 OK，10 項條件略過（暫存磁碟 strict realpath 不支援及 symlink 權限不足）。
+- 新增基準保留測試後，`python -B -m unittest discover -s tests -p 'test_handoff_baseline.py' -v`：7 項全數通過；未將這次局部重跑描述為重跑全套 191 項。
+- `python -B -m unittest discover -s tests -p 'test_plugin_setup.py' -v`：28 項全數通過。
+- 隔離 Git 專案的公開 CLI 互通驗證：Codex create → cc-feather read/update（保留縮排的手動章節）→ Codex complete/archive → cc-feather history/seal → Codex 讀取封存歷史，全程成功。
+
+未修改 sibling cc-feather、已安裝 plugin 或使用者設定；保留工作區原有修改。沒有執行新的模型行為測試、發布版本或重建獨立執行檔。
+
 ## cc-feather v0.10.1 Python 與 handoff 對齊（2026-10-02）
 
 來源為 sibling checkout `cc-feather`，HEAD `e72aef80c4b6d0fb32791b4d51da0b1f131642eb`。來源檔案 SHA-256 與適配說明見 [同步清單](cc-feather-handoff-manifest.json)。未修改 cc-feather、已安裝 plugin 或使用者全域設定。既有 setup 工作保留；handoff 環境測試的 bundle fixture 補上目前安裝器要求的入口模板。

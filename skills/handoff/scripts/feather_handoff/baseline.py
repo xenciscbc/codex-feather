@@ -10,6 +10,8 @@ MAX_FILES = 256
 MAX_FILE_BYTES = 16 * 1024 * 1024
 MAX_TOTAL_BYTES = 64 * 1024 * 1024
 HEADING = "## 檔案基準"
+# CommonMark ATX heading: up to three spaces of indent, then a space, a tab or the line end.
+ATX = re.compile(r" {0,3}(#{1,6})(?:[ \t]|$)")
 
 
 def source_name(value: object) -> str:
@@ -77,6 +79,12 @@ def validate(value: object) -> dict:
     return value
 
 
+def level(line: str) -> int:
+    """ATX heading level of a line without its line ending, or 0 when it is not a heading."""
+    match = ATX.match(line)
+    return len(match[1]) if match else 0
+
+
 def headings(text: str) -> list[tuple[int, int, str]]:
     """Markdown headings outside fenced examples; offsets preserve original bytes-as-text."""
     result = []
@@ -90,7 +98,7 @@ def headings(text: str) -> list[tuple[int, int, str]]:
                 fence = None
         elif match and (match[1][0] != "`" or "`" not in match[2]):
             fence = (match[1][0], len(match[1]))
-        elif re.match(r"^#{1,6} ", stripped):
+        elif level(stripped):
             result.append((offset, offset + len(line), stripped))
         offset += len(line)
     return result
@@ -106,7 +114,7 @@ def section(text: str, title: str = HEADING) -> tuple[int, int, int] | None:
         return None
     index = found[0]
     start, body, _ = items[index]
-    end = next((item[0] for item in items[index + 1:] if re.match(r"^#{1,2} ", item[2])), len(text))
+    end = next((item[0] for item in items[index + 1:] if level(item[2]) <= 2), len(text))
     return start, body, end
 
 

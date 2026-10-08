@@ -34,6 +34,8 @@ def summary(snapshot: Snapshot) -> dict:
             problems.append(f"Expected one nonempty {label} field" if key in REQUIRED else f"Duplicate {label} field")
     if not title:
         problems.append("Missing work title")
+    elif not title.group(1).strip():
+        problems.append("Work title must not be blank")
     elif title.start() != 0:
         problems.append("Work title must be the first line; preceding content needs review")
     if fields["status"] not in STATUSES:

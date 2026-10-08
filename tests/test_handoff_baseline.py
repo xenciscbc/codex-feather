@@ -47,6 +47,20 @@ class BaselineFormatTest(unittest.TestCase):
         self.assertTrue(saved.startswith(manual))
         self.assertEqual(baseline.parse(saved), sample())
 
+    def test_atx_siblings_survive_baseline_replacement(self):
+        for newline in ("\n", "\r\n"):
+            for heading in ("  ## Notes", "   # Notes", "##\tNotes", "##"):
+                with self.subTest(newline=newline, heading=heading):
+                    block = baseline.put('# work' + newline, sample())
+                    sibling = heading + newline + 'KEEP' + newline
+                    original = block + sibling
+                    self.assertEqual(baseline.parse(original), sample())
+                    updated = copy.deepcopy(sample())
+                    updated['files'][0]['sha256'] = 'b' * 64
+                    saved = baseline.put(original, updated)
+                    self.assertTrue(saved.endswith(sibling))
+                    self.assertEqual(baseline.parse(saved), updated)
+
     def test_ambiguous_section_and_duplicate_json_keys(self):
         block = baseline.put('# work\n', sample())
         for text in [block + block, block.replace('"schema_version": 1', '"schema_version": 1, "schema_version": 1'),

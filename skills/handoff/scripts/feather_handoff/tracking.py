@@ -9,6 +9,11 @@ RULE = "/.feather/handoffs/"
 MARKER = "# cc-feather: track /.feather/handoffs/"
 
 
+def rule_line(line: str) -> str:
+    """A .gitignore line as Git reads it: leading whitespace is part of the pattern, trailing spaces are not."""
+    return line.rstrip("\r\n").rstrip(" ")
+
+
 def git(store: Store, *arguments: str) -> subprocess.CompletedProcess:
     return subprocess.run(["git", "-C", str(store.project), *arguments], capture_output=True, text=True,
                           encoding="utf-8", timeout=5, env=git_environment())
@@ -29,9 +34,9 @@ def ensure_tracking(store: Store, work: str, choice: str) -> str:
     original = read_file(path) if path.exists() else None
     content = original.data.decode("utf-8") if original else ""
     newline = "\r\n" if "\r\n" in content else "\n"
-    marked = any(line.strip() == MARKER for line in content.splitlines())
+    marked = any(rule_line(line) == MARKER for line in content.splitlines())
     if choice == "track":
-        changed = "".join(line for line in content.splitlines(keepends=True) if line.strip() != RULE)
+        changed = "".join(line for line in content.splitlines(keepends=True) if rule_line(line) != RULE)
         if not marked:
             changed += (newline if changed and not changed.endswith("\n") else "") + MARKER + newline
         if changed != content:

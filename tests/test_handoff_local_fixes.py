@@ -245,6 +245,20 @@ class SmallFixesTest(LocalFixesBase):
         cleared = self.run_tool("clear", payload={"version": entry["document_version"], "ids": [entry["id"]]})
         self.assertEqual(cleared["status"], "ok")
 
+    def test_blank_title_is_a_format_problem_in_read_and_list(self):
+        for label, data in {"lf": record(status="進行中", heading="  \t"),
+                            "crlf": record(status="進行中", heading="  \t", eol="\r\n"),
+                            "bom": b"\xef\xbb\xbf" + record(status="進行中", heading="  \t")}.items():
+            with self.subTest(label):
+                self.put("a.md", data)
+                read = self.run_tool("read", "--work", "a.md", expected=2)
+                self.assertEqual((read["status"], read["complete"], read["record_status"]), ("partial", False, "格式待確認"))
+                self.assertIn("Work title must not be blank", read["problems"])
+                listed = self.run_tool("list", expected=2)
+                self.assertFalse(listed["complete"])
+                self.assertIn("Work title must not be blank", listed["issues"][0]["message"])
+                self.assertEqual((self.directory / "a.md").read_bytes(), data)
+
     def test_superscript_com_and_lpt_names_are_reserved(self):
         for name in ("COM¹.md", "com².md", "LPT³", "COM1.md"):
             with self.subTest(name), self.assertRaises(storage.HandoffError) as raised:
@@ -331,6 +345,29 @@ class DetailsSectionsTest(LocalFixesBase):
         self.assertEqual(path.read_bytes(), data)
 
 
+    def test_indented_tab_and_empty_atx_headings_end_the_details_section(self):
+        # CommonMark ATX headings: up to three spaces of indent, then a space, a tab or the line end.
+        for index, heading in enumerate(["  ## Notes", "   # Notes", "##\tNotes", "##"]):
+            with self.subTest(heading=heading):
+                name = f"h{index}.md"
+                created = self.run_tool("create", "--work", name,
+                                        payload={"title": "Foo", "fields": FIELDS, "details": f"old\n\n{heading}\nKEEP"})
+                self.assertEqual(len(created["warnings"]), 1)
+                self.assertIn(f"'{heading}' starts a separate section", created["warnings"][0])
+                updated = self.run_tool("update", "--work", name, payload={"version": created["version"], "details": "new"})
+                self.assertEqual(updated["preserved_sections"], [heading])
+                self.assertTrue((self.directory / name).read_text(encoding="utf-8").endswith(
+                    f"## 詳細紀錄\nnew\n{heading}\nKEEP\n"))
+
+    def test_four_space_indent_and_hash_without_separator_stay_details_text(self):
+        created = self.run_tool("create", "--work", "a.md",
+                                payload={"title": "Foo", "fields": FIELDS, "details": "old\n\n    ## code\n##tag"})
+        self.assertNotIn("warnings", created)
+        updated = self.run_tool("update", "--work", "a.md", payload={"version": created["version"], "details": "new"})
+        self.assertEqual(updated["preserved_sections"], [])
+        self.assertTrue((self.directory / "a.md").read_text(encoding="utf-8").endswith("## 詳細紀錄\nnew\n"))
+
+
 class CompletionArchiveFailureTest(LocalFixesBase):
     """H2: an archival failure after the completed work was saved is a partial result."""
 
@@ -397,6 +434,23 @@ class TrackingMarkerTest(LocalFixesBase):
                 self.assertEqual(tracking.ensure_tracking(store, "a.md", "default"), "existing-rule")
                 self.assertEqual(self.ignore.read_bytes(), f"*.log{newline}{MARKER}{newline}".encode())
         self.assertEqual(self.index(), b"")
+
+    def test_indented_marker_does_not_disable_the_default_rule(self):
+        # Leading whitespace makes a different Git line: this one is a pattern, not the tool's comment.
+        self.ignore.write_bytes(f" {MARKER}\n".encode())
+        created = self.run_tool("create", "--work", "a.md", payload={"fields": FIELDS})
+        self.assertEqual(created["tracking"], "ignored")
+        self.assertEqual(self.ignore.read_bytes(), f" {MARKER}\n/.feather/handoffs/\n".encode())
+        ignored = subprocess.run(["git", "-c", f"safe.directory={self.project.as_posix()}", "-C", str(self.project),
+                                  "check-ignore", "-q", "--", ".feather/handoffs/a.md"], capture_output=True)
+        self.assertEqual(ignored.returncode, 0)
+
+    def test_track_keeps_an_indented_user_rule_and_strips_only_trailing_spaces(self):
+        # Git ignores trailing spaces, so the second line is the tool's rule; the first is a user pattern.
+        self.ignore.write_bytes(b" /.feather/handoffs/\n/.feather/handoffs/  \n")
+        result = self.run_tool("create", "--work", "a.md", payload={"fields": FIELDS, "tracking": "track"})
+        self.assertEqual(result["tracking"], "track")
+        self.assertEqual(self.ignore.read_bytes(), f" /.feather/handoffs/\n{MARKER}\n".encode())
 
     def test_broader_ignore_rule_still_blocks_tracking(self):
         self.ignore.write_bytes(b".feather/\n")
@@ -800,6 +854,12 @@ class SwallowedDetailsTest(LocalFixesBase):
         self.assertEqual(result["preserved_sections"], ["## 手動備註"])
         self.assertTrue((self.directory / "a.md").read_bytes().endswith(
             "## 詳細紀錄\nnew evidence\n## 手動備註\nkeep\n".encode("utf-8")))
+
+    def test_unclosed_fence_over_an_indented_section_is_refused(self):
+        data = record(status="進行中", details="```\nopen") + "\n  ## 手動備註\nkeep\n".encode("utf-8")
+        result = self.update_details(data, expected=2)
+        self.assertEqual(result["code"], "details-format")
+        self.assertIn("leave a code fence open over   ## 手動備註", result["message"])
 
     def test_unclosed_opener_over_a_section_holding_a_bare_code_block_is_refused(self):
         # T2 by design: from the text alone this swallowed section looks like a closed example with a heading

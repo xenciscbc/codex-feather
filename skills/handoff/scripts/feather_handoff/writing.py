@@ -51,7 +51,7 @@ def validated_fields(payload: dict, create: bool) -> dict[str, str]:
 def placed_sections(text: str, start: int = 0) -> list[tuple[int, str]]:
     """Fence-aware level-1/2 headings at or after start, with offsets relative to start."""
     return [(offset - start, line) for offset, _, line in baseline.headings(text)
-            if offset >= start and re.match(r"^#{1,2} ", line)]
+            if offset >= start and baseline.level(line) <= 2]
 
 
 def sections(text: str, start: int = 0) -> list[str]:
@@ -80,7 +80,7 @@ def swallowed_sections(span: str) -> tuple[list[str], str | None]:
                 fence, held, inner = None, [], False
             elif match and match[1][0] == fence[0] and match[2].strip() and (fence[0] != "`" or "`" not in match[2]):
                 inner = True
-            elif re.match(r"^#{1,2} ", stripped):
+            elif 0 < baseline.level(stripped) <= 2:
                 held.append(stripped)
         elif match and (match[1][0] != "`" or "`" not in match[2]):
             fence = (match[1][0], len(match[1]))
