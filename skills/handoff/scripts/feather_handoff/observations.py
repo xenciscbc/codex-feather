@@ -7,7 +7,7 @@ import stat
 import subprocess
 
 from . import baseline
-from .storage import HandoffError, Store, check_path, read_file, git_environment, signature
+from .storage import HandoffError, Store, check_path, lazy_fetch_guard, read_file, run_git, signature
 
 
 def source_info(project: Path, name: str):
@@ -66,12 +66,12 @@ def observe(project: Path, name: str, budget: list[int]):
 
 
 def git_observation(project: Path) -> dict:
-    env = git_environment()
+    def run(*args, no_lazy_fetch=False):
+        return run_git(project, *args, errors="replace", no_lazy_fetch=no_lazy_fetch)
 
-    def run(*args):
-        return subprocess.run(["git", "-C", str(project), *args], capture_output=True,
-                              text=True, encoding="utf-8", errors="replace", timeout=5, env=env)
-
+    # rev-parse and symbolic-ref read no object. show-ref --verify checks that the ref's object exists, so in a
+    # checkout with a promisor remote it could fetch it: it runs only after the promisor-remote detection, with
+    # --no-lazy-fetch when that is needed, and otherwise the observation is unknown with the detection's cause code.
     try:
         probe = run("rev-parse", "--is-inside-work-tree")
         if probe.returncode:
@@ -87,7 +87,11 @@ def git_observation(project: Path) -> dict:
         if head.returncode:
             if head.returncode != 1 or branch.returncode != 0:
                 return {"state": "unknown", "reason": "git-error"}
-            unborn = run("show-ref", "--verify", "--quiet", branch.stdout.strip())
+            try:
+                lazy = lazy_fetch_guard(project)
+            except HandoffError as error:  # promisor-remote or promisor-unknown
+                return {"state": "unknown", "reason": error.code}
+            unborn = run("show-ref", "--verify", "--quiet", branch.stdout.strip(), no_lazy_fetch=lazy)
             if unborn.returncode != 1:
                 return {"state": "unknown", "reason": "git-error"}
         return {"state": "available", "head": head.stdout.strip() if head.returncode == 0 else None,
@@ -104,7 +108,7 @@ def capture(store: Store, payload: object) -> dict:
     budget = [baseline.MAX_TOTAL_BYTES]
     observed = [observe(store.project, name, budget) for name in paths]
     files = [item for item, _ in observed]
-    identities = {}
+    identities: dict[tuple[int, ...] | str, int] = {}
     for index, (item, saved_signature) in enumerate(observed):
         if item["state"] == "unknown":
             continue
@@ -114,7 +118,7 @@ def capture(store: Store, payload: object) -> dict:
             if current_signature != saved_signature:
                 files[index] = unknown(item["path"], "changed")
             if current_signature:
-                identity = current_signature[:2]
+                identity: tuple[int, ...] | str = current_signature[:2]
                 if identity[1] == 0:  # st_ino unavailable: fall back to the resolved path
                     identity = os.path.normcase(str(path.resolve()))
                 if identity in identities:
@@ -174,7 +178,7 @@ def compare(store: Store, name: str) -> dict:
         return {"status": "missing", "complete": False, "work": name,
                 "code": "missing", "message": "Work file is absent; history was not searched"}
     info = summary(work)
-    result = {"work": name, "work_version": work.version, "files": [], "git": None, "issues": []}
+    result: dict = {"work": name, "work_version": work.version, "files": [], "git": None, "issues": []}
     try:
         saved = baseline.parse(work.text)
     except ValueError as error:

@@ -87,10 +87,15 @@ def level(line: str) -> int:
 
 def headings(text: str) -> list[tuple[int, int, str]]:
     """Markdown headings outside fenced examples; offsets preserve original bytes-as-text."""
+    return _scan(text.splitlines(keepends=True))
+
+
+def _scan(lines: list[str]) -> list[tuple[int, int, str]]:
+    """Headings outside fenced examples among lines that keep their line endings."""
     result = []
     fence = None
     offset = 0
-    for line in text.splitlines(keepends=True):
+    for line in lines:
         stripped = line.rstrip("\r\n")
         match = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", stripped)
         if fence:
@@ -102,6 +107,17 @@ def headings(text: str) -> list[tuple[int, int, str]]:
             result.append((offset, offset + len(line), stripped))
         offset += len(line)
     return result
+
+
+def header_end(text: str, start: int) -> int:
+    """Where the work header that follows the title (ending at start) ends: the next heading, or the text end.
+
+    Uses the same fence-aware ATX rule as the managed sections, so summaries and header updates agree. Lines end
+    only at "\\n" (a CRLF line ends there too): field values may hold characters such as \\x0c or \\x85 that
+    str.splitlines would break on, and a "#" or fence after one must stay part of the field line."""
+    lines = text.split("\n")
+    lines = [line + "\n" for line in lines[:-1]] + ([lines[-1]] if lines[-1] else [])
+    return next((offset for offset, _, _ in _scan(lines) if offset >= start), len(text))
 
 
 def section(text: str, title: str = HEADING) -> tuple[int, int, int] | None:

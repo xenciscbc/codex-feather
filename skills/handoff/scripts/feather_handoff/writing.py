@@ -68,7 +68,8 @@ def swallowed_sections(span: str) -> tuple[list[str], str | None]:
     Uses the fence rules of baseline.headings. A self-contained fenced example may hide headings; an opener left
     open at the end of the span, or a hiding fence that also holds a same-character opener with an info string
     (such as a managed ```json block), shows an unbalanced opener that swallowed later sections."""
-    hidden, fence, held, inner, reason = [], None, [], False, None
+    held: list[str] = []
+    hidden, fence, inner, reason = [], None, False, None
     for line in span.splitlines(keepends=True):
         stripped = line.rstrip("\r\n")
         match = FENCE.match(stripped)
@@ -167,8 +168,7 @@ def update_work(store: Store, name: str, raw: object) -> dict:
             content = content[:title.start(1)] + value + content[title.end(1):]
             title = re.search(r"(?m)^# ([^\r\n]+)", content)
             assert title is not None
-        section = re.search(r"(?m)^#{1,6} ", content[title.end():])
-        end = title.end() + section.start() if section else len(content)
+        end = baseline.header_end(content, title.end())
         header, tail = content[:end], content[end:]
         for key, value in fields.items():
             expression = rf"(?m)^{FIELDS[key]}[：:][^\r\n]*"
@@ -258,6 +258,20 @@ def update_work(store: Store, name: str, raw: object) -> dict:
     return result
 
 
+# Recovery for a tracking failure where no command that can read objects ran because of a promisor remote.
+PROMISOR_CAUSES = {
+    "promisor-remote": ("tracking was not established because the repository declares a promisor remote and the "
+                        "installed Git cannot disable lazy fetch, so no Git command that could fetch from it was run. "
+                        "Do not retry: report it, and upgrade Git to 2.45.0 or later or have the user remove the "
+                        "promisor configuration."),
+    "promisor-unknown": ("tracking was not established because the Git configuration or the installed Git version "
+                         "could not be established, so a lazy fetch from a promisor remote could not be ruled out and "
+                         "no Git command that could read objects was run. Do not retry: report it, have the user make "
+                         "the configuration and Git readable, and if a promisor remote is declared, upgrade Git to "
+                         "2.45.0 or later or have the user remove the promisor configuration."),
+}
+
+
 def finish_save(store: Store, name: str, tracking: str, payload: dict) -> dict:
     result = read_work(store, name)
     try:
@@ -272,7 +286,29 @@ def finish_save(store: Store, name: str, tracking: str, payload: dict) -> dict:
             state = "missing"
         except (OSError, ValueError):
             pass
-        if result["work_status"] == "完成":
+        cause = getattr(error, "code", "io")
+        if cause == "git-unavailable":
+            # Retrying while Git cannot run would loop; wait for Git, then apply tracking once.
+            unavailable = ("tracking was not applied because Git could not be run or did not respond. "
+                           "Do not repeat create or update now. Once Git runs, apply tracking with ")
+            if result["work_status"] == "完成":
+                recovery = ("Completed work was saved but not archived, and " + unavailable + "archive using "
+                            f'{{"version": "<current version>", "tracking": "{tracking}"}}; '
+                            "it archives the work and then applies tracking.")
+            else:
+                recovery = ("Work was saved, but " + unavailable + "update using the current version and "
+                            f'{{"tracking": "{tracking}"}}.')
+        elif cause in PROMISOR_CAUSES:
+            # Retrying cannot help: the checkout or the installed Git has to change first.
+            blocked = PROMISOR_CAUSES[cause] + " Once that is done, apply tracking with "
+            if result["work_status"] == "完成":
+                recovery = ("Completed work was saved but not archived, and " + blocked + "archive using "
+                            f'{{"version": "<current version>", "tracking": "{tracking}"}}; '
+                            "it archives the work and then applies tracking.")
+            else:
+                recovery = ("Work was saved, but " + blocked + "update using the current version and "
+                            f'{{"tracking": "{tracking}"}}.')
+        elif result["work_status"] == "完成":
             # A completed work refuses normal updates; archive retries it and applies the same tracking choice.
             recovery = ("Completed work was saved but not archived because tracking failed; inspect the reported "
                         "work and resolve the Git rules, then run archive with "
@@ -282,7 +318,7 @@ def finish_save(store: Store, name: str, tracking: str, payload: dict) -> dict:
             recovery = ("Work was saved before tracking failed; inspect the reported work and Git rules, "
                         "then retry update with the current version. Do not repeat create.")
         return {**observed, "status": "partial", "complete": False, "code": "tracking-failed",
-                "cause_code": getattr(error, "code", "io"), "message": str(error), "state": state,
+                "cause_code": cause, "message": str(error), "state": state,
                 "work": name, "work_path": str(store.directory / name), "saved_version": result["version"],
                 "tracking": "error", "recovery": recovery}
     if result["work_status"] == "完成":

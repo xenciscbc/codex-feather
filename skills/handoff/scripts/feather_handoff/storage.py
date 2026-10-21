@@ -1,8 +1,10 @@
 """Project containment and content snapshots shared by public operations."""
 from dataclasses import dataclass
+import errno
 import hashlib
 import os
 from pathlib import Path
+import re
 import stat
 import subprocess
 import secrets
@@ -29,6 +31,213 @@ def git_environment() -> dict[str, str]:
         environment.pop(key, None)
     environment.update(GIT_OPTIONAL_LOCKS="0", LC_ALL="C")
     return environment
+
+
+# Every Git command starts with these after the resolved executable: no configured pager runs, no optional index
+# refresh is written, and the empty core.fsmonitor value disables a configured fsmonitor whether Git reads the
+# setting as a boolean or a hook path.
+GIT_COMMAND = ("--no-pager", "--no-optional-locks", "-c", "core.fsmonitor=")
+
+WINDOWS = os.name == "nt"
+# The only file name the resolver accepts. On Windows no PATHEXT applies: a git.cmd or git.bat is a batch file, which
+# cmd.exe parses again with its own quoting and expansion rules, so the arguments Git receives would no longer be the
+# ones given here.
+GIT_NAME = "git.exe" if WINDOWS else "git"
+_SEPARATORS = "\\/" if WINDOWS else "/"
+# An entry still holding a variable reference was never expanded; it names no directory the user meant.
+_UNEXPANDED = re.compile(r"%[^%]+%" if WINDOWS else r"\$(?:\{|[A-Za-z_])")
+
+
+def _fully_qualified(entry: str) -> bool:
+    """A path that names one directory whatever the current directory and drive are.
+
+    Windows: a drive letter followed by a separator, or a UNC path \\\\server\\share; never drive-relative (C:foo),
+    rooted without a drive (\\foo), or a device path (\\\\?\\, \\\\.\\). Decided from the text, not ntpath.isabs,
+    whose answer for rooted paths differs between Python versions; _considered also skips one holding a further `:`
+    or a character in U+F000-U+F0FF (see _colon_split). POSIX: starts with /."""
+    if not WINDOWS:
+        return entry.startswith("/")
+    if len(entry) >= 3 and entry[0].isascii() and entry[0].isalpha() and entry[1] == ":" and entry[2] in _SEPARATORS:
+        return True
+    if len(entry) < 5 or entry[0] not in _SEPARATORS or entry[1] not in _SEPARATORS or entry[2] in _SEPARATORS:
+        return False
+    parts = re.split(r"[\\/]", entry[2:])
+    return len(parts) >= 2 and parts[0] not in {"?", "."} and bool(parts[1])
+
+
+# POSIX namespaces whose paths name something different in every process, such as /proc/self/cwd or
+# /proc/<pid>/cwd for a current directory and /dev/fd/<n> for an open directory: an entry under them starts with /
+# yet can name the current directory.
+_PROCESS_NAMESPACES = (("proc",), ("dev", "fd"))
+
+
+def _climbs(entry: str) -> bool:
+    """POSIX: the entry has a `..` component. The kernel follows a symbolic link before it applies the `..` after it,
+    so the text alone cannot tell where such an entry leads: with the /var/run -> /run link that many distributions
+    ship, /var/run/../proc/self/cwd is /proc/self/cwd. Windows resolves `..` from the text before it follows any
+    link, so a `..` component there leads where its text says."""
+    return not WINDOWS and ".." in entry.split("/")
+
+
+def _process_relative(entry: str) -> bool:
+    """POSIX: the entry is /proc, /dev/fd or under one of them, judged from the text without resolving links.
+
+    Repeated separators and `.` components are ignored, so neither //proc//self/cwd nor /proc/./self/cwd/ escapes.
+    Only meaningful for an entry without a `..` component; _considered skips every entry with one first."""
+    parts = [part for part in entry.split("/") if part not in {"", "."}]
+    return any(tuple(parts[:len(namespace)]) == namespace for namespace in _PROCESS_NAMESPACES)
+
+
+# Private-use characters that Git for Windows' MSYS runtime, like Cygwin, maps back to the ASCII characters Windows
+# forbids in names: U+F03A becomes `:`.
+_MSYS_MAPPED = re.compile("[\uf000-\uf0ff]")
+
+
+def _colon_split(entry: str) -> bool:
+    """Windows: the fully qualified entry holds a `:` anywhere but right after its drive letter, and a UNC entry
+    any `:`, or the entry holds any character in U+F000-U+F0FF, which the MSYS layer maps back to such characters
+    (U+F03A to `:`). Git for Windows' MSYS layer reads such a value as several entries split at that `:` for the
+    programs it starts, so C:\\tools:. would hand them `.`, and so would C:\\tools followed by U+F03A and `.`. A
+    drive-letter entry's own `:` is at index 1 and a UNC entry starts with two separators, so both `:` cases are a
+    `:` from index 2 on; the private-use range is skipped wherever it appears."""
+    return WINDOWS and (":" in entry[2:] or bool(_MSYS_MAPPED.search(entry)))
+
+
+def _considered(entry: str) -> bool:
+    """One directory the user named, the same for every process and current directory: nonempty, fully qualified,
+    expanded and, on Windows, without a `:`, or a character in U+F000-U+F0FF, that Git's MSYS layer would split at
+    (see _colon_split), on POSIX without a `..` component and outside /proc and /dev/fd. Classifies PATH entries
+    and GIT_EXEC_PATH alike."""
+    return (bool(entry) and "\0" not in entry and _fully_qualified(entry) and not _UNEXPANDED.search(entry)
+            and not _colon_split(entry) and (WINDOWS or not (_climbs(entry) or _process_relative(entry))))
+
+
+def git_search_path(value: str | None) -> list[str]:
+    """The PATH entries the resolver considers and the only ones Git's own PATH keeps, in their order.
+
+    An absent or empty PATH has none. On Windows one pair of surrounding double quotes is removed first. Empty,
+    relative, not fully qualified and unexpanded entries are skipped, on Windows every entry with a `:` anywhere but
+    right after its drive letter, every UNC entry with a `:` and every entry with a character in U+F000-U+F0FF
+    (see _colon_split), and on POSIX every entry with a `..` component (see _climbs) and every entry under /proc or
+    /dev/fd (see _process_relative), so neither the current directory nor a directory relative to it takes part."""
+    entries = []
+    for entry in (value or "").split(os.pathsep):
+        if WINDOWS and len(entry) >= 2 and entry[0] == entry[-1] == '"':
+            entry = entry[1:-1]
+        if _considered(entry):
+            entries.append(entry)
+    return entries
+
+
+def _missing_git() -> FileNotFoundError:
+    """The error subprocess.run raises today when it cannot find a bare `git`, so every caller's handling holds."""
+    if WINDOWS:
+        return FileNotFoundError(errno.ENOENT, "The system cannot find the file specified", None, 2)
+    return FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), "git")
+
+
+def resolve_git(value: str | None) -> str:
+    """The Git executable the handoff tool starts: the first git_search_path entry holding GIT_NAME as a regular
+    file after following links, and on POSIX executable, returned as the entry joined with that name (not a link's
+    target). Entries git_search_path skips are never looked at: empty, relative and not fully qualified ones,
+    unexpanded ones, on Windows those with a `:` anywhere but right after the drive letter (any `:` in a UNC entry)
+    or with a character in U+F000-U+F0FF, and on POSIX those with a `..` component or under /proc or /dev/fd, which
+    can name the current directory although they start with /. Raises FileNotFoundError when no entry has one. Asks
+    neither the operating system nor Python to search (no shutil.which, os.get_exec_path or os.defpath), starts no
+    process and keeps no result between calls."""
+    for entry in git_search_path(value):
+        candidate = os.path.join(entry, GIT_NAME)
+        try:
+            found = stat.S_ISREG(os.stat(candidate).st_mode)
+        except (OSError, ValueError):
+            continue
+        if found and (WINDOWS or os.access(candidate, os.X_OK)):
+            return candidate
+    raise _missing_git()
+
+
+def run_git(directory: Path, *arguments: str, errors: str = "strict",
+            no_lazy_fetch: bool = False) -> subprocess.CompletedProcess:
+    """The only place the handoff tool starts Git: `<git> <GIT_COMMAND> [--no-lazy-fetch] -C <directory> <arguments>`.
+
+    <git> is the absolute path resolve_git found in PATH, never a bare name; when it finds none, FileNotFoundError
+    propagates and no process starts. Git runs from its own directory with only the entries git_search_path keeps as
+    its PATH, so the process's current directory takes part neither in finding Git nor in Git's own lookups, and
+    <directory> is passed absolute. An inherited GIT_EXEC_PATH stays only when its value, taken as is without
+    removing quotes, holds no path separator (os.pathsep) and is an entry the resolver would consider, so on Windows
+    one with a `:` anywhere but right after its drive letter, or with a character in U+F000-U+F0FF, is dropped too;
+    any other is dropped, because Git would look up its git-* programs there and puts the value before its children's
+    PATH, so a value that is not one considered entry would reach them relative to the project after -C or through
+    the process's current directory. Needs no Store, so root discovery can use it. no_lazy_fetch is what
+    lazy_fetch_guard returned for the operation. Output is UTF-8 text decoded with `errors`; OSError and
+    subprocess.TimeoutExpired propagate, and each caller judges the return code."""
+    value = os.environ.get("PATH")
+    executable = resolve_git(value)
+    environment = git_environment()
+    environment["PATH"] = os.pathsep.join(git_search_path(value))
+    exec_path = environment.get("GIT_EXEC_PATH")
+    if exec_path is not None and (os.pathsep in exec_path or not _considered(exec_path)):
+        del environment["GIT_EXEC_PATH"]
+    target = str(directory)
+    if not _fully_qualified(target):
+        target = os.path.abspath(target)
+    options = (*GIT_COMMAND, "--no-lazy-fetch") if no_lazy_fetch else GIT_COMMAND
+    return subprocess.run([executable, *options, "-C", target, *arguments], capture_output=True, text=True,
+                          encoding="utf-8", errors=errors, timeout=5, env=environment,
+                          cwd=os.path.dirname(executable))
+
+
+# The first Git release whose --no-lazy-fetch keeps a command from fetching a missing object from a promisor remote.
+NO_LAZY_FETCH_FROM = (2, 45, 0)
+_FALSE = {"false", "no", "off", "0", ""}
+
+
+def _promisor_keys(listing: str) -> list[str]:
+    """Settings in a `git config --list -z` listing that declare a promisor remote.
+
+    A remote.<name>.promisor set to a value Git reads as false declares nothing; any other value, including one Git
+    would reject, counts as declared."""
+    found = []
+    for entry in listing.split("\0"):
+        key, separator, value = entry.partition("\n")
+        name = key.lower()
+        if name == "extensions.partialclone" or (name.startswith("remote.") and name.endswith(".partialclonefilter")):
+            found.append(key)
+        elif name.startswith("remote.") and name.endswith(".promisor"):
+            if not separator or value.strip().lower() not in _FALSE:
+                found.append(key)
+    return found
+
+
+def lazy_fetch_guard(directory: Path) -> bool:
+    """Run before an operation's first Git command that can read objects, and before tracking writes anything.
+
+    Reads the effective configuration with includes followed. Returns False when it declares no promisor remote and
+    True when it declares one and Git is 2.45.0 or later, so every later command must pass no_lazy_fetch=True.
+    Raises HandoffError promisor-remote when an older Git could fetch from the remote, and promisor-unknown when the
+    configuration or the Git version cannot be established; then no command that can read objects may run. OSError
+    and subprocess.TimeoutExpired propagate. The configuration and version reads themselves read no objects."""
+    listing = run_git(directory, "config", "--list", "--includes", "-z", errors="replace")
+    if listing.returncode:
+        raise HandoffError("promisor-unknown",
+                           "Could not read the Git configuration to find whether it declares a promisor remote: "
+                           + (listing.stderr.strip() or f"git config exited with {listing.returncode}"))
+    keys = _promisor_keys(listing.stdout)
+    if not keys:
+        return False
+    reported = run_git(directory, "version", errors="replace")
+    match = re.match(r"git version (\d+)\.(\d+)\.(\d+)", reported.stdout.strip())
+    if reported.returncode or not match:
+        raise HandoffError("promisor-unknown",
+                           f"The Git configuration declares a promisor remote ({', '.join(keys)}), and the installed "
+                           "Git version could not be established")
+    version = tuple(map(int, match.groups()))
+    if version < NO_LAZY_FETCH_FROM:
+        raise HandoffError("promisor-remote",
+                           f"The Git configuration declares a promisor remote ({', '.join(keys)}), and Git "
+                           f"{'.'.join(map(str, version))} cannot disable lazy fetch (2.45.0 or later can); no command "
+                           "that could fetch from that remote was run")
+    return True
 
 
 # Canonical project roots resolved in this process; links above them were followed once.
@@ -113,8 +322,7 @@ def _same(first, second) -> bool:
 
 
 def _discover(path: Path) -> subprocess.CompletedProcess:
-    return subprocess.run(["git", "-C", str(path), "rev-parse", "--show-toplevel"], capture_output=True, text=True,
-                          encoding="utf-8", errors="replace", timeout=5, env=git_environment())
+    return run_git(path, "rev-parse", "--show-toplevel", errors="replace")
 
 
 NO_TOP_LEVEL = "Git root discovery succeeded without reporting an absolute top-level path"
@@ -263,6 +471,7 @@ def read_file(path: Path) -> Snapshot:
             or len(data) != before.st_size):
         raise HandoffError("changed", f"File changed during read: {path}")
     return Snapshot(path, data)
+
 
 def create_file(path: Path, data: bytes) -> Snapshot:
     check_path(path)

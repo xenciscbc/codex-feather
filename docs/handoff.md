@@ -2,9 +2,11 @@
 
 `handoff` 讓同一專案的新 session 從精簡 Markdown 接續工作。使用 [setup](setup.md) 可選擇專案或使用者範圍，並獨立決定是否加入入口指引。也可手動部署 `skills/handoff/` 整個目錄；安裝或更新後在新 session 使用。
 
-Plugin 提供三個明確入口：`$handoff-list` 列出目前專案的交接清單，`$handoff-save` 保存目前工作的進度，也可附上工作名稱；`$handoff-resume` 依既有 Read or resume 規則選定交接、核對工作區並接續已授權工作，若多筆未完成工作且無法明確選定則詢問。三者共用 `handoff` 的規則與工具；原本的 `handoff` 仍依指令與上下文處理列出、保存、讀取或接續。單獨呼叫保存入口即表示要求保存，只有工作對象不明時才詢問；列出入口只回傳清單。這三個入口隨 plugin 提供，單獨部署 `skills/handoff/` 不包含它們。
+Plugin 提供四個明確入口：`$handoff-list` 列出目前專案的交接清單，`$handoff-save` 保存目前工作的進度，也可附上工作名稱；`$handoff-resume` 依既有 Read or resume 規則選定交接、核對工作區並接續已授權工作，若多筆未完成工作且無法明確選定則詢問；`$handoff-tidy` 整理既有交接，操作方式見下方「整理交接」。四者共用 `handoff` 的規則與工具；原本的 `handoff` 仍依指令與上下文處理列出、保存、讀取或接續。單獨呼叫保存入口即表示要求保存，只有工作對象不明時才詢問；列出入口只回傳清單。
 
-`handoff-list`、`handoff-save` 與 `handoff-resume` 設定 `policy.allow_implicit_invocation: false`，僅供使用者透過 `$handoff-list`、`$handoff-save`、`$handoff-resume` 明確呼叫，不參與 Agent 的自動技能選擇。原本 `handoff` 的上下文判斷與既有交接自動維護規則維持不變。
+這四個明確入口隨 plugin 提供，單獨部署 `skills/handoff/` 不包含它們。
+
+`handoff-list`、`handoff-save`、`handoff-resume` 與 `handoff-tidy` 設定 `policy.allow_implicit_invocation: false`，僅供使用者明確呼叫，不參與 Agent 的自動技能選擇。原本 `handoff` 的上下文判斷與既有交接自動維護規則維持不變。
 
 例如：
 
@@ -133,9 +135,9 @@ Claude memory 情境也使用同一入口：基本搜尋包含 `claude-memory-di
 `claude-memory-project-non-git` 必須在 Git repository 外的暫存目錄 prepare，否則素材實際上會成為外層 repository 的子目錄，入口會拒絕。專案定位的其他情境名稱與原生回覆驗收準則可從 prepare 的 `--help` 及產生的 `review.json` 查閱。Claude memory 的實際結果見 [外部交接驗收紀錄](claude-memory-validation.md)；既有 Feather 行為見 [交接驗收紀錄](handoff-validation.md)。
 
 
-## cc-feather v0.16.0 對齊
+## cc-feather v0.30.0 對齊
 
-Python 工具與交接格式對齊 cc-feather v0.16.0，可沿用同一專案的 `.feather/handoffs`。CLI 的 `--project` 與 `--exact-root` 可放在子命令前後，使用錯誤也會回傳 JSON。詳細紀錄更新會保護後續章節與檔案基準；完成保存與歸檔失敗會回報已保存的狀態與復原方式，避免重複完成身份。清除或封存會檢查可能尚未歸檔的工作與衝突標記。
+Python 工具與交接格式對齊 cc-feather v0.30.0（`03c9c24`），可沿用同一專案的 `.feather/handoffs`。CLI 的 `--project` 與 `--exact-root` 可放在子命令前後，使用錯誤也會回傳 JSON。詳細紀錄更新會保護後續章節與檔案基準；完成保存與歸檔失敗會回報已保存的狀態與復原方式，避免重複完成身份。清除或封存會檢查可能尚未歸檔的工作與衝突標記。
 
 章節邊界採 Markdown ATX 規則：最多三個前導空格、井號後接空格／Tab 或行尾的標題，都能保護後續手動內容；四格縮排或 `##Notes` 仍屬正文。空白工作標題會使讀取與清單回傳 `partial`，保留原檔並標示格式待確認。
 
@@ -144,3 +146,15 @@ Python 工具與交接格式對齊 cc-feather v0.16.0，可沿用同一專案的
 指定 Git 追蹤後，工具保留共用的 `# cc-feather: track /.feather/handoffs/` 註解，讓兩邊後續預設保存都尊重此選擇。移除工具自己的 ignore 規則時僅忽略行尾空格，保留前導空白不同的使用者規則；縮排的 marker 不代表已選擇追蹤。Windows 的跨 API ctime 差異仍被容許，同一 API 的讀取前後變動檢查保留。來源與移植差異見 [同步清單](cc-feather-handoff-manifest.json)。
 
 歷史查詢的 `--work` 使用條目標題。清除與封存透過 Python 工具執行；遇到 `pending-archive` 時保留檔案、回報待歸檔路徑，待歸檔問題另行處理；遇到 `pending-unknown` 時先釐清或修復該工作，不能據此判定歷史可移除。完整復原流程見 [handoff skill](../skills/handoff/SKILL.md#clear-and-seal-results)。
+
+本次追加同步的標頭修正，讓清單、讀取與欄位更新都以相同的 fence-aware ATX 規則判斷標頭終點。章節內的 `下一步：` 等文字因此保留為正文；LF／CRLF 以外的換行字元仍留在原欄位內。
+
+所有交接 runtime 的 Git 呼叫共用同一個 helper，從 PATH 的完整路徑尋找 Git，停用 pager、fsmonitor 與可選 index 更新。Git 無法啟動或逾時時，保存回傳 `tracking-failed`／`git-unavailable`，保留工作並等待 Git 恢復；已完成的工作在此情況下不會自動歸檔。對可能從 promisor remote 取得物件的命令，先檢查設定，Git 2.45+ 加上 `--no-lazy-fetch`；較舊 Git 或無法確認設定時回報原因，等待環境修復。詳細 PATH 規則與復原方式見 [工具說明](../skills/handoff/references/tool.md)。
+
+Codex 繼續依目前專案的審查規則判定完成；交接中記載的未決審查、延後驗收與未接受提交仍須保留，不因關閉 ticket 或結束 session 而視為完成。本次同步未移植 cc-feather 的其他 delegation 或模型設定流程。
+
+## 整理交接
+
+Plugin 的 `$handoff-tidy` 提供三種模式：Proposal 只讀記錄、歷史標題與本機 Git 標籤／commit 主旨，提出下一項工作、合併、過時與缺漏建議；Selected check 核對指定記錄與目前來源；Full check 核對全部記錄。沒有參數時先選模式，`$handoff-tidy login` 核對 `login.md`，`$handoff-tidy all` 先說明記錄與項目數、成本，經確認後才開始完整核對。
+
+核對不執行專案測試、build 或腳本，也不 fetch。整理建議不會啟動或接續所建議的工作；只有確認具體變更後才透過既有 Python 工具寫回。合併先保存並讀回目標，再移除來源中已搬移的項目；每次寫入前比對版本，外部變動只讓受影響部分重新提案。核對完成的項目與舊驗證證據保存在詳細紀錄；驗收限制、計畫審查紀錄與未決問題仍保留。完整規則見 [handoff-tidy skill](../skills/handoff-tidy/SKILL.md)。

@@ -1,5 +1,25 @@
 # 交接檔案工具驗收
 
+## 2026-10-21：cc-feather v0.30.0 同步
+
+來源固定為 cc-feather `03c9c24be6a9a60fca4037c9ccd3d0e77d0d85bd`，已透過遠端 HEAD 核對；前次基準為 v0.16.0 的 `da4948c53f72e0c198dcdc00dd8e48ef3a43c16d`。38 個上游來源檔的 SHA-256 與移植差異記錄於 [同步清單](cc-feather-handoff-manifest.json)。共享 runtime 保留既有 ctime／讀取前後一致性檢查，另補上 mypy 所需的型別標註與明確空值分支。
+
+| 環境 | 命令／範圍 | 結果 |
+| --- | --- | --- |
+| Windows，Python 3.11.9 | `python -B -m unittest discover -s tests -p 'test_handoff_*.py'` | 型別修正後重跑 260 項，18 項略過，其餘通過；237.503 秒 |
+| 同上 | `python -B -m unittest discover -s tests -p test_plugin_setup.py` | 28 項通過；73.083 秒 |
+| 同上 | `python -B -m unittest discover -s tests -p test_snapshot_deployment.py -v` | 型別修正後重跑 2 項通過；5.034 秒 |
+| 同上 | `python -B -m unittest discover -s tests -p test_handoff_encoding.py -v` | 1 項通過，含 cp950／cp1252 子案例；0.306 秒 |
+| 同上 | 上游來源雜湊、Python AST、skill 相對連結及 `handoff-tidy` 明確呼叫 policy | 通過 |
+| 同上 | `git diff --check` | 通過 |
+| 同上，mypy 1.18.2 | `python -B -m mypy --check-untyped-defs skills/handoff/scripts scripts/setup_installer` | 30 個來源檔通過；使用專案既有 `.scratch/feather-improvements/dev-deps`，未另裝依賴 |
+
+新增的上游回歸測試涵蓋 Git helper、完整 PATH 解析、promisor／lazy-fetch 防護、Git 無法啟動或逾時的 partial 復原、LF／CRLF／BOM 與 fenced ATX 標頭邊界，以及整理交接時先寫目標、連續更新目標、保留驗收限制與來源歸檔的公開 CLI 流程。既有 Codex ctime 回歸測試保留。原始記錄位於 `.scratch/cc-handoff-sync-v030-tests.log` 及 `.scratch/cc-handoff-sync-v030-plugin-tests.log`。
+
+`handoff-tidy` 已改為 Codex 的 `agents/openai.yaml` 明確呼叫入口，沿用上游提案、核對、確認、版本比對與寫入次序，並保留 Codex 計畫審查記錄。原生 executor 與 analyst 已補完候選 skill 的操作演練：模式選擇、Proposal、Full check 的讀取確認邊界、Selected check、版本衝突後重新提案、確認寫回、部分保存與復原歸檔均通過主 Agent 驗收；來源、無關記錄及 Git metadata 不變。具體 session、產物及 CLI 環境限制見 [原生演練](handoff-live-validation.md#2026-10-21handoff-tidy-候選-skill-原生演練)。沒有更改已安裝的 plugin cache、發布版本或建立 tag。
+
+## 2026-09-11：初版驗收
+
 日期：2026-09-11。規格：[Feather 交接工具](../.scratch/feather-handoff-tool/spec.md)。
 
 ## 程式驗收

@@ -3,7 +3,7 @@ import re
 from datetime import datetime
 
 from .storage import Snapshot, Store, read_file
-from .baseline import parse as parse_baseline
+from .baseline import header_end, parse as parse_baseline
 
 
 FIELDS = {"updated": "更新", "status": "狀態", "goal": "目標", "progress": "進度",
@@ -22,9 +22,8 @@ def valid_time(value: str) -> bool:
 def summary(snapshot: Snapshot) -> dict:
     text = snapshot.text
     title = re.search(r"(?m)^# (.+)$", text)
-    remainder = text[title.end():] if title else text
-    section = re.search(r"(?m)^#{1,6} ", remainder)
-    header = remainder[:section.start()] if section else remainder
+    start = title.end() if title else 0
+    header = text[start:header_end(text, start)]
     fields = {}
     problems = []
     for key, label in FIELDS.items():
